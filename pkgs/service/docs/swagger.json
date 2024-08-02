@@ -1,0 +1,741 @@
+{
+    "swagger": "2.0",
+    "info": {
+        "description": "This is an internal server used for data tracking and verification.",
+        "title": "Swagger Example API",
+        "termsOfService": "http://swagger.io/terms/",
+        "contact": {
+            "name": "API Support",
+            "url": "http://www.swagger.io/support",
+            "email": "support@swagger.io"
+        },
+        "version": "1.0"
+    },
+    "paths": {
+        "/batchResubmissions": {
+            "post": {
+                "description": "Retrieves logs of batch resubmissions for past batches.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Batches"
+                ],
+                "summary": "Get batch resubmissions",
+                "parameters": [
+                    {
+                        "description": "Past Batches Request",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/service.PastBatchesRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "schema": {
+                            "$ref": "#/definitions/service.Response-service_ResponseArray-service_LogType"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request or past batches less than 0",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized: Incorrect token",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/builtBatches": {
+            "post": {
+                "description": "Retrieves logs of built batches for past batches.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Batches"
+                ],
+                "summary": "Get built batches",
+                "parameters": [
+                    {
+                        "description": "Past Batches Request",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/service.PastBatchesRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "schema": {
+                            "$ref": "#/definitions/service.Response-service_ResponseArray-service_LogType"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request or past batches less than 0",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized: Incorrect token",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/committedSubmissionBatches": {
+            "post": {
+                "description": "Retrieves logs of committed submission batches for past batches.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Batches"
+                ],
+                "summary": "Get committed submission batches",
+                "parameters": [
+                    {
+                        "description": "Past Batches Request",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/service.PastBatchesRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "schema": {
+                            "$ref": "#/definitions/service.Response-service_ResponseArray-service_LogType"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request or past batches less than 0",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized: Incorrect token",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/finalizedBatchSubmissions": {
+            "post": {
+                "description": "Retrieves logs of finalized batch submissions for past epochs.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Epochs"
+                ],
+                "summary": "Get finalized batch submissions",
+                "parameters": [
+                    {
+                        "description": "Past Epochs Request",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/service.PastEpochsRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "schema": {
+                            "$ref": "#/definitions/service.Response-service_ResponseArray-service_LogType"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request or past epochs less than 0",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized: Incorrect token",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/getDailyRewards": {
+            "post": {
+                "description": "Calculates the daily rewards for a given slot and day based on submission counts.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Rewards"
+                ],
+                "summary": "Get daily rewards for a slot",
+                "parameters": [
+                    {
+                        "description": "Daily Rewards Request",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/service.DailyRewardsRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "schema": {
+                            "$ref": "#/definitions/service.Response-int"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request or slotId out of range",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized: Incorrect token",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/getTotalRewards": {
+            "post": {
+                "description": "Get the total rewards for a specific slot ID",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Rewards"
+                ],
+                "summary": "Get total rewards",
+                "parameters": [
+                    {
+                        "description": "Rewards Request",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/service.RewardsRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "schema": {
+                            "$ref": "#/definitions/service.Response-int"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request or slotId out of range",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized: Incorrect token",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/includedEpochSubmissionsCount": {
+            "post": {
+                "description": "Retrieves the total number of submissions included in batches for past epochs.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Submissions"
+                ],
+                "summary": "Get included epoch submissions count",
+                "parameters": [
+                    {
+                        "description": "Past Epochs Request",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/service.PastEpochsRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "schema": {
+                            "$ref": "#/definitions/service.Response-int"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request or past epochs less than 0",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized: Incorrect token",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/receivedEpochSubmissions": {
+            "post": {
+                "description": "Retrieves submission details for a specified number of past epochs.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Submissions"
+                ],
+                "summary": "Get submissions for past epochs",
+                "parameters": [
+                    {
+                        "description": "Past Epochs Request",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/service.PastEpochsRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "schema": {
+                            "$ref": "#/definitions/service.Response-service_ResponseArray-service_LogType"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request or past epochs less than 0",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized: Incorrect token",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/receivedEpochSubmissionsCount": {
+            "post": {
+                "description": "Retrieves the total number of submissions received for past epochs.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Submissions"
+                ],
+                "summary": "Get received epoch submissions count",
+                "parameters": [
+                    {
+                        "description": "Past Epochs Request",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/service.PastEpochsRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "schema": {
+                            "$ref": "#/definitions/service.Response-int"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request or past epochs less than 0",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized: Incorrect token",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/rewardUpdates": {
+            "post": {
+                "description": "Retrieves logs of reward updates for a specific day.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Rewards"
+                ],
+                "summary": "Get reward updates",
+                "parameters": [
+                    {
+                        "description": "Past Days Request",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/service.PastDaysRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "schema": {
+                            "$ref": "#/definitions/service.Response-service_ResponseArray-service_LogType"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request or day less than 0",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized: Incorrect token",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/totalSubmissions": {
+            "post": {
+                "description": "Retrieves total submissions for a slot over a specified number of past days.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Submissions"
+                ],
+                "summary": "Get total submissions",
+                "parameters": [
+                    {
+                        "description": "Submissions Request",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/service.SubmissionsRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "schema": {
+                            "$ref": "#/definitions/service.Response-service_ResponseArray-service_DailySubmissions"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request, past days less than 1, or invalid slotId",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized: Incorrect token",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/triggeredCollectionFlows": {
+            "post": {
+                "description": "Retrieves logs of triggered collection flows for past epochs.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Epochs"
+                ],
+                "summary": "Get triggered collection flows",
+                "parameters": [
+                    {
+                        "description": "Past Epochs Request",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/service.PastEpochsRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response\"Response[ResponseArray[LogType]] \"Successful Response",
+                        "schema": {
+                            "$ref": "#/definitions/service.Response-service_ResponseArray-service_LogType"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request or past epochs less than 0",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized: Incorrect token",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "definitions": {
+        "service.DailyRewardsRequest": {
+            "type": "object",
+            "properties": {
+                "day": {
+                    "type": "integer"
+                },
+                "slot_id": {
+                    "type": "integer"
+                },
+                "token": {
+                    "type": "string"
+                }
+            }
+        },
+        "service.DailySubmissions": {
+            "type": "object",
+            "properties": {
+                "day": {
+                    "type": "integer"
+                },
+                "submissions": {
+                    "type": "integer"
+                }
+            }
+        },
+        "service.InfoType-int": {
+            "type": "object",
+            "properties": {
+                "response": {
+                    "type": "integer"
+                },
+                "success": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "service.InfoType-service_ResponseArray-service_DailySubmissions": {
+            "type": "object",
+            "properties": {
+                "response": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/service.DailySubmissions"
+                    }
+                },
+                "success": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "service.InfoType-service_ResponseArray-service_LogType": {
+            "type": "object",
+            "properties": {
+                "response": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/service.LogType"
+                    }
+                },
+                "success": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "service.LogType": {
+            "type": "object",
+            "additionalProperties": true
+        },
+        "service.PastBatchesRequest": {
+            "type": "object",
+            "properties": {
+                "past_batches": {
+                    "type": "integer"
+                },
+                "token": {
+                    "type": "string"
+                }
+            }
+        },
+        "service.PastDaysRequest": {
+            "type": "object",
+            "properties": {
+                "past_days": {
+                    "type": "integer"
+                },
+                "token": {
+                    "type": "string"
+                }
+            }
+        },
+        "service.PastEpochsRequest": {
+            "type": "object",
+            "properties": {
+                "past_epochs": {
+                    "type": "integer"
+                },
+                "token": {
+                    "type": "string"
+                }
+            }
+        },
+        "service.Response-int": {
+            "type": "object",
+            "properties": {
+                "info": {
+                    "$ref": "#/definitions/service.InfoType-int"
+                },
+                "request_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "service.Response-service_ResponseArray-service_DailySubmissions": {
+            "type": "object",
+            "properties": {
+                "info": {
+                    "$ref": "#/definitions/service.InfoType-service_ResponseArray-service_DailySubmissions"
+                },
+                "request_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "service.Response-service_ResponseArray-service_LogType": {
+            "type": "object",
+            "properties": {
+                "info": {
+                    "$ref": "#/definitions/service.InfoType-service_ResponseArray-service_LogType"
+                },
+                "request_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "service.RewardsRequest": {
+            "type": "object",
+            "properties": {
+                "slot_id": {
+                    "type": "integer"
+                },
+                "token": {
+                    "type": "string"
+                }
+            }
+        },
+        "service.SubmissionsRequest": {
+            "type": "object",
+            "properties": {
+                "past_days": {
+                    "type": "integer"
+                },
+                "slot_id": {
+                    "type": "integer"
+                },
+                "token": {
+                    "type": "string"
+                }
+            }
+        }
+    }
+}

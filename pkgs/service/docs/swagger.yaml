@@ -1,0 +1,486 @@
+definitions:
+  service.DailyRewardsRequest:
+    properties:
+      day:
+        type: integer
+      slot_id:
+        type: integer
+      token:
+        type: string
+    type: object
+  service.DailySubmissions:
+    properties:
+      day:
+        type: integer
+      submissions:
+        type: integer
+    type: object
+  service.InfoType-int:
+    properties:
+      response:
+        type: integer
+      success:
+        type: boolean
+    type: object
+  service.InfoType-service_ResponseArray-service_DailySubmissions:
+    properties:
+      response:
+        items:
+          $ref: '#/definitions/service.DailySubmissions'
+        type: array
+      success:
+        type: boolean
+    type: object
+  service.InfoType-service_ResponseArray-service_LogType:
+    properties:
+      response:
+        items:
+          $ref: '#/definitions/service.LogType'
+        type: array
+      success:
+        type: boolean
+    type: object
+  service.LogType:
+    additionalProperties: true
+    type: object
+  service.PastBatchesRequest:
+    properties:
+      past_batches:
+        type: integer
+      token:
+        type: string
+    type: object
+  service.PastDaysRequest:
+    properties:
+      past_days:
+        type: integer
+      token:
+        type: string
+    type: object
+  service.PastEpochsRequest:
+    properties:
+      past_epochs:
+        type: integer
+      token:
+        type: string
+    type: object
+  service.Response-int:
+    properties:
+      info:
+        $ref: '#/definitions/service.InfoType-int'
+      request_id:
+        type: string
+    type: object
+  service.Response-service_ResponseArray-service_DailySubmissions:
+    properties:
+      info:
+        $ref: '#/definitions/service.InfoType-service_ResponseArray-service_DailySubmissions'
+      request_id:
+        type: string
+    type: object
+  service.Response-service_ResponseArray-service_LogType:
+    properties:
+      info:
+        $ref: '#/definitions/service.InfoType-service_ResponseArray-service_LogType'
+      request_id:
+        type: string
+    type: object
+  service.RewardsRequest:
+    properties:
+      slot_id:
+        type: integer
+      token:
+        type: string
+    type: object
+  service.SubmissionsRequest:
+    properties:
+      past_days:
+        type: integer
+      slot_id:
+        type: integer
+      token:
+        type: string
+    type: object
+info:
+  contact:
+    email: support@swagger.io
+    name: API Support
+    url: http://www.swagger.io/support
+  description: This is an internal server used for data tracking and verification.
+  termsOfService: http://swagger.io/terms/
+  title: Swagger Example API
+  version: "1.0"
+paths:
+  /batchResubmissions:
+    post:
+      consumes:
+      - application/json
+      description: Retrieves logs of batch resubmissions for past batches.
+      parameters:
+      - description: Past Batches Request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/service.PastBatchesRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Successful Response
+          schema:
+            $ref: '#/definitions/service.Response-service_ResponseArray-service_LogType'
+        "400":
+          description: Invalid request or past batches less than 0
+          schema:
+            type: string
+        "401":
+          description: 'Unauthorized: Incorrect token'
+          schema:
+            type: string
+      summary: Get batch resubmissions
+      tags:
+      - Batches
+  /builtBatches:
+    post:
+      consumes:
+      - application/json
+      description: Retrieves logs of built batches for past batches.
+      parameters:
+      - description: Past Batches Request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/service.PastBatchesRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Successful Response
+          schema:
+            $ref: '#/definitions/service.Response-service_ResponseArray-service_LogType'
+        "400":
+          description: Invalid request or past batches less than 0
+          schema:
+            type: string
+        "401":
+          description: 'Unauthorized: Incorrect token'
+          schema:
+            type: string
+      summary: Get built batches
+      tags:
+      - Batches
+  /committedSubmissionBatches:
+    post:
+      consumes:
+      - application/json
+      description: Retrieves logs of committed submission batches for past batches.
+      parameters:
+      - description: Past Batches Request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/service.PastBatchesRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Successful Response
+          schema:
+            $ref: '#/definitions/service.Response-service_ResponseArray-service_LogType'
+        "400":
+          description: Invalid request or past batches less than 0
+          schema:
+            type: string
+        "401":
+          description: 'Unauthorized: Incorrect token'
+          schema:
+            type: string
+      summary: Get committed submission batches
+      tags:
+      - Batches
+  /finalizedBatchSubmissions:
+    post:
+      consumes:
+      - application/json
+      description: Retrieves logs of finalized batch submissions for past epochs.
+      parameters:
+      - description: Past Epochs Request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/service.PastEpochsRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Successful Response
+          schema:
+            $ref: '#/definitions/service.Response-service_ResponseArray-service_LogType'
+        "400":
+          description: Invalid request or past epochs less than 0
+          schema:
+            type: string
+        "401":
+          description: 'Unauthorized: Incorrect token'
+          schema:
+            type: string
+      summary: Get finalized batch submissions
+      tags:
+      - Epochs
+  /getDailyRewards:
+    post:
+      consumes:
+      - application/json
+      description: Calculates the daily rewards for a given slot and day based on
+        submission counts.
+      parameters:
+      - description: Daily Rewards Request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/service.DailyRewardsRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Successful Response
+          schema:
+            $ref: '#/definitions/service.Response-int'
+        "400":
+          description: Invalid request or slotId out of range
+          schema:
+            type: string
+        "401":
+          description: 'Unauthorized: Incorrect token'
+          schema:
+            type: string
+        "500":
+          description: Internal Server Error
+          schema:
+            type: string
+      summary: Get daily rewards for a slot
+      tags:
+      - Rewards
+  /getTotalRewards:
+    post:
+      consumes:
+      - application/json
+      description: Get the total rewards for a specific slot ID
+      parameters:
+      - description: Rewards Request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/service.RewardsRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Successful Response
+          schema:
+            $ref: '#/definitions/service.Response-int'
+        "400":
+          description: Invalid request or slotId out of range
+          schema:
+            type: string
+        "401":
+          description: 'Unauthorized: Incorrect token'
+          schema:
+            type: string
+        "500":
+          description: Internal Server Error
+          schema:
+            type: string
+      summary: Get total rewards
+      tags:
+      - Rewards
+  /includedEpochSubmissionsCount:
+    post:
+      consumes:
+      - application/json
+      description: Retrieves the total number of submissions included in batches for
+        past epochs.
+      parameters:
+      - description: Past Epochs Request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/service.PastEpochsRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Successful Response
+          schema:
+            $ref: '#/definitions/service.Response-int'
+        "400":
+          description: Invalid request or past epochs less than 0
+          schema:
+            type: string
+        "401":
+          description: 'Unauthorized: Incorrect token'
+          schema:
+            type: string
+      summary: Get included epoch submissions count
+      tags:
+      - Submissions
+  /receivedEpochSubmissions:
+    post:
+      consumes:
+      - application/json
+      description: Retrieves submission details for a specified number of past epochs.
+      parameters:
+      - description: Past Epochs Request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/service.PastEpochsRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Successful Response
+          schema:
+            $ref: '#/definitions/service.Response-service_ResponseArray-service_LogType'
+        "400":
+          description: Invalid request or past epochs less than 0
+          schema:
+            type: string
+        "401":
+          description: 'Unauthorized: Incorrect token'
+          schema:
+            type: string
+      summary: Get submissions for past epochs
+      tags:
+      - Submissions
+  /receivedEpochSubmissionsCount:
+    post:
+      consumes:
+      - application/json
+      description: Retrieves the total number of submissions received for past epochs.
+      parameters:
+      - description: Past Epochs Request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/service.PastEpochsRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Successful Response
+          schema:
+            $ref: '#/definitions/service.Response-int'
+        "400":
+          description: Invalid request or past epochs less than 0
+          schema:
+            type: string
+        "401":
+          description: 'Unauthorized: Incorrect token'
+          schema:
+            type: string
+      summary: Get received epoch submissions count
+      tags:
+      - Submissions
+  /rewardUpdates:
+    post:
+      consumes:
+      - application/json
+      description: Retrieves logs of reward updates for a specific day.
+      parameters:
+      - description: Past Days Request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/service.PastDaysRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Successful Response
+          schema:
+            $ref: '#/definitions/service.Response-service_ResponseArray-service_LogType'
+        "400":
+          description: Invalid request or day less than 0
+          schema:
+            type: string
+        "401":
+          description: 'Unauthorized: Incorrect token'
+          schema:
+            type: string
+      summary: Get reward updates
+      tags:
+      - Rewards
+  /totalSubmissions:
+    post:
+      consumes:
+      - application/json
+      description: Retrieves total submissions for a slot over a specified number
+        of past days.
+      parameters:
+      - description: Submissions Request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/service.SubmissionsRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Successful Response
+          schema:
+            $ref: '#/definitions/service.Response-service_ResponseArray-service_DailySubmissions'
+        "400":
+          description: Invalid request, past days less than 1, or invalid slotId
+          schema:
+            type: string
+        "401":
+          description: 'Unauthorized: Incorrect token'
+          schema:
+            type: string
+      summary: Get total submissions
+      tags:
+      - Submissions
+  /triggeredCollectionFlows:
+    post:
+      consumes:
+      - application/json
+      description: Retrieves logs of triggered collection flows for past epochs.
+      parameters:
+      - description: Past Epochs Request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/service.PastEpochsRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Successful Response"Response[ResponseArray[LogType]] "Successful
+            Response
+          schema:
+            $ref: '#/definitions/service.Response-service_ResponseArray-service_LogType'
+        "400":
+          description: Invalid request or past epochs less than 0
+          schema:
+            type: string
+        "401":
+          description: 'Unauthorized: Incorrect token'
+          schema:
+            type: string
+      summary: Get triggered collection flows
+      tags:
+      - Epochs
+swagger: "2.0"

@@ -1,0 +1,1 @@
+docker run --env-file .env -p 9988:9988 libp2p-submission-sequencer
