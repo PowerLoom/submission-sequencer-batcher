@@ -4,11 +4,14 @@ import (
 	"collector/config"
 	"collector/pkgs/contract"
 	"context"
+	"crypto/tls"
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/ethereum/go-ethereum/rpc"
 	log "github.com/sirupsen/logrus"
 	"math/big"
+	"net/http"
 	"strings"
 	"time"
 )
@@ -23,11 +26,17 @@ var (
 
 // TODO: Check ethclient options, connection issues
 func ConfigureClient() {
-	var err error
-	Client, err = ethclient.Dial(config.SettingsObj.ClientUrl)
+	rpcClient, err := rpc.DialOptions(
+		context.Background(),
+		config.SettingsObj.ClientUrl,
+		rpc.WithHTTPClient(
+			&http.Client{Transport: &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}},
+		),
+	)
 	if err != nil {
 		log.Fatal(err)
 	}
+	Client = ethclient.NewClient(rpcClient)
 }
 
 func StartFetchingBlocks() {
