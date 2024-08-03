@@ -47,7 +47,7 @@ func LoadConfig() {
 		"PROST_CHAIN_ID",
 		"BLOCK_TIME",
 		"SLACK_REPORTING_URL",
-		//"REWARDS_BACKEND_URL", TODO: Get this URL for deployment and uncomment this line
+		"REWARDS_BACKEND_URL",
 	}
 
 	for envVar := range requiredEnvVars {
@@ -118,7 +118,7 @@ func LoadConfig() {
 	}
 	config.BlockTime = blockTime
 
-	checkOptionalEnvVar(config.RewardsBackendUrl, "REWARDS_BACKEND_URL")
+	checkOptionalEnvVar(config.AuthWriteToken, "AUTH_WRITE_TOKEN")
 
 	SettingsObj = &config
 }
