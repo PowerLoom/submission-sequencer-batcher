@@ -47,7 +47,7 @@ func LoadConfig() {
 		"PROST_CHAIN_ID",
 		"BLOCK_TIME",
 		"SLACK_REPORTING_URL",
-		"REWARDS_BACKEND_URL",
+		//"REWARDS_BACKEND_URL", TODO: Get this URL for deployment and uncomment this line
 	}
 
 	for envVar := range requiredEnvVars {
@@ -117,6 +117,8 @@ func LoadConfig() {
 		log.Fatalf("Failed to parse BLOCK_TIME environment variable: %v", blockTimeParseErr)
 	}
 	config.BlockTime = blockTime
+
+	checkOptionalEnvVar(config.RewardsBackendUrl, "REWARDS_BACKEND_URL")
 
 	SettingsObj = &config
 }
