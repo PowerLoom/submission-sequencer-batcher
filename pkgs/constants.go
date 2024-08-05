@@ -15,6 +15,7 @@ const (
 
 // General Key Constants
 const (
+	CurrentEpoch             = "CurrentEpochID"
 	CollectorKey             = "SnapshotCollector"
 	TxsKey                   = "SnapshotTransactions"
 	TimeSlotKey              = "TimeSlotPreference"
