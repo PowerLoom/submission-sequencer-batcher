@@ -34,7 +34,6 @@ func ProcessEvents(block *types.Block, contractABI abi.ABI) {
 					continue
 				}
 				if event.DataMarketAddress.Hex() == config.SettingsObj.DataMarketAddress {
-					event.EpochId = new(big.Int).SetBytes(vLog.Topics[1][:])
 					log.Debugf("Epoch Released at block %d: %s\n", block.Header().Number, event.EpochId.String())
 					if CurrentEpochID.Cmp(event.EpochId) < 0 {
 						CurrentEpochID = event.EpochId
