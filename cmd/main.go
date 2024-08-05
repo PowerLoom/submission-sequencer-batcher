@@ -16,8 +16,8 @@ func main() {
 	utils.InitLogger()
 	config.LoadConfig()
 
-	clients.InitializeReportingClient(config.SettingsObj.SlackReportingUrl, 5*time.Second)
-	clients.InitializeRewardsBackendClient(config.SettingsObj.RewardsBackendUrl, 5*time.Second)
+	clients.InitializeReportingClient(config.SettingsObj.SlackReportingUrl, time.Duration(config.SettingsObj.HttpTimeout)*time.Second)
+	clients.InitializeRewardsBackendClient(config.SettingsObj.RewardsBackendUrl, time.Duration(config.SettingsObj.HttpTimeout)*time.Second)
 
 	var wg sync.WaitGroup
 

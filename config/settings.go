@@ -25,6 +25,7 @@ type Settings struct {
 	BatchSize                 int
 	ChainID                   int64
 	BlockTime                 int
+	HttpTimeout               int
 	SlackReportingUrl         string
 	RewardsBackendUrl         string
 }
@@ -48,6 +49,7 @@ func LoadConfig() {
 		"BLOCK_TIME",
 		"SLACK_REPORTING_URL",
 		"REWARDS_BACKEND_URL",
+		"HTTP_TIMEOUT",
 	}
 
 	for envVar := range requiredEnvVars {
@@ -118,6 +120,11 @@ func LoadConfig() {
 	}
 	config.BlockTime = blockTime
 
+	httpTimeout, timeoutParseErr := strconv.Atoi(getEnv("HTTP_TIMEOUT", ""))
+	if timeoutParseErr != nil {
+		log.Fatalf("Failed to parse HTTP_TIMEOUT environment variable: %v", timeoutParseErr)
+	}
+	config.HttpTimeout = httpTimeout
 	checkOptionalEnvVar(config.AuthWriteToken, "AUTH_WRITE_TOKEN")
 
 	SettingsObj = &config
