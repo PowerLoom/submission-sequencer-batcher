@@ -6,6 +6,7 @@ import (
 	"collector/pkgs/contract"
 	"collector/pkgs/helpers/clients"
 	"collector/pkgs/helpers/merkle"
+	"collector/pkgs/helpers/redis"
 	"context"
 	"fmt"
 	"github.com/cenkalti/backoff/v4"
@@ -67,6 +68,7 @@ func PopulateStateVars() {
 
 	if output, err := Instance.CurrentEpoch(&bind.CallOpts{}, config.SettingsObj.DataMarketContractAddress); output.EpochId != nil && err == nil {
 		CurrentEpochID.Set(output.EpochId)
+		redis.Set(context.Background(), pkgs.CurrentEpoch, CurrentEpochID.String(), 0)
 	} else {
 		CurrentEpochID.Set(big.NewInt(0))
 	}
