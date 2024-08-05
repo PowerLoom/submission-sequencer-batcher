@@ -73,7 +73,7 @@ func LoadConfig() {
 		AuthWriteToken:            getEnv("AUTH_WRITE_TOKEN", ""),
 		SlackReportingUrl:         getEnv("SLACK_REPORTING_URL", ""),
 		RewardsBackendUrl:         getEnv("REWARDS_BACKEND_URL", ""),
-		DataMarketContractAddress: common.HexToAddress(getEnv("DATA_MARKET_ADDRESS", "")),
+		DataMarketContractAddress: common.HexToAddress(getEnv("DATA_MARKET_CONTRACT", "")),
 	}
 
 	signerAddressesList := []string{}
