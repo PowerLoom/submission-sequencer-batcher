@@ -34,6 +34,7 @@ func ConfigureClient() {
 		),
 	)
 	if err != nil {
+		log.Errorf("Failed to connect to client: %s", err)
 		log.Fatal(err)
 	}
 	Client = ethclient.NewClient(rpcClient)

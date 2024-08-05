@@ -27,7 +27,7 @@ func ConfigureContractInstance() {
 func UpdateSubmissionLimit(curBlock *big.Int) *big.Int {
 	var submissionLimit *big.Int
 	if window, err := Instance.SnapshotSubmissionWindow(&bind.CallOpts{}, config.SettingsObj.DataMarketContractAddress); err != nil {
-		clients.SendFailureNotification("Contract query error", fmt.Sprintf("Failed to fetch snapshot submission window: %s", err.Error()), time.Now().String(), "High")
+		clients.SendFailureNotification("Contract query error [UpdateSubmissionLimit]", fmt.Sprintf("Failed to fetch snapshot submission window: %s", err.Error()), time.Now().String(), "High")
 		log.Errorf("Failed to fetch snapshot submission window: %s\n", err.Error())
 	} else {
 		submissionLimit = new(big.Int).Add(curBlock, window)
@@ -49,7 +49,7 @@ func MustQuery[K any](ctx context.Context, call func() (val K, err error)) (K, e
 	// Use the retry package to execute the operation with backoff
 	err := backoff.Retry(operation, backoff.WithMaxRetries(expBackOff, 3))
 	if err != nil {
-		clients.SendFailureNotification("Contract query error", err.Error(), time.Now().String(), "High")
+		clients.SendFailureNotification("Contract query error [MustQuery]", err.Error(), time.Now().String(), "High")
 		return *new(K), err
 	}
 	return val, err
