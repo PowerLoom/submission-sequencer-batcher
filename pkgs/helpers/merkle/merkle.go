@@ -69,6 +69,8 @@ func BuildBatchSubmissions(epochId *big.Int, headers []string) ([]*ipfs.BatchSub
 		log.Errorln("Batch finalization error: ", err.Error())
 	}
 
+	log.Debugf("Finalized batch submissions for epoch %d: %s\n", epochId, batchSubmissions)
+
 	return batchSubmissions, err
 }
 
@@ -137,7 +139,7 @@ func finalizeBatches(batchedKeys [][]string, epochId *big.Int, tree *imt.Increme
 		cids := []string{}
 
 		var keys []string
-		for pid := range projectMostFrequent {
+		for pid, _ := range projectMostFrequent {
 			keys = append(keys, pid)
 		}
 
@@ -175,6 +177,7 @@ func finalizeBatches(batchedKeys [][]string, epochId *big.Int, tree *imt.Increme
 	for _, bs := range batchSubmissions {
 		ids = append(ids, bs.Batch.ID.String())
 	}
+
 	// Set finalized batches in redis for epochId
 	logEntry := map[string]interface{}{
 		"epoch_id":                epochId.String(),
@@ -194,6 +197,7 @@ func arrangeKeysInBatches(keys []string) [][]string {
 		parts := strings.Split(key, ".")
 		if len(parts) != 3 {
 			log.Errorln("Improper key stored in redis: ", key)
+			clients.SendFailureNotification("arrangeKeysInBatches", fmt.Sprintf("Improper key stored in redis: %s", key), time.Now().String(), "High")
 			continue // skip malformed entries
 		}
 		projectId := parts[1]
