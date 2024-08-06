@@ -136,7 +136,8 @@ func (tm *TxManager) BatchUpdateRewards(day *big.Int) []string {
 		parts := strings.Split(key, ".")
 
 		if len(parts) != 3 {
-			fmt.Println("key does not have three parts: ", key)
+			clients.SendFailureNotification("BatchUpdateRewards", fmt.Sprintf("key does not have three parts: %s", key), time.Now().String(), "Medium")
+			log.Errorln("key does not have 3 parts: ", key)
 			continue
 		}
 		slot, ok := new(big.Int).SetString(parts[2], 10)
@@ -364,7 +365,7 @@ func (tm *TxManager) EnsureBatchSubmissionSuccess(epochID *big.Int) {
 						return
 					}
 					txKey := redis.BatchSubmissionKey(batchID.String(), updatedNonce)
-					txValue := fmt.Sprintf("%s.%s.%d.%d.%s.%s", reTx.Hash().Hex(), cid, batchID, epochID, pids, cids)
+					txValue := fmt.Sprintf("%s.%s.%d.%d.%s.%s.%s", reTx.Hash().Hex(), cid, batchID, epochID, pids, cids, common.Bytes2Hex(finalizedCidsRootHash[:]))
 					if err = redis.SetSubmission(context.Background(), txKey, txValue, txSet, time.Hour); err != nil {
 						log.Errorln("Redis ipfs error: ", err.Error())
 						return
