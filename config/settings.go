@@ -15,6 +15,7 @@ type Settings struct {
 	ContractAddress           string
 	RedisHost                 string
 	RedisPort                 string
+	RedisDB                   string
 	IPFSUrl                   string
 	DataMarketAddress         string
 	DataMarketContractAddress common.Address
@@ -37,6 +38,7 @@ func LoadConfig() {
 		"PROST_RPC_URL",
 		"PROTOCOL_STATE_CONTRACT",
 		"REDIS_HOST",
+		"REDIS_DB",
 		"REDIS_PORT",
 		"IPFS_URL",
 		"DATA_MARKET_CONTRACT",
@@ -67,6 +69,7 @@ func LoadConfig() {
 		ContractAddress:           getEnv("PROTOCOL_STATE_CONTRACT", ""),
 		RedisHost:                 getEnv("REDIS_HOST", ""),
 		RedisPort:                 getEnv("REDIS_PORT", ""),
+		RedisDB:                   getEnv("REDIS_DB", ""),
 		IPFSUrl:                   getEnv("IPFS_URL", ""),
 		DataMarketAddress:         getEnv("DATA_MARKET_CONTRACT", ""),
 		AuthReadToken:             getEnv("AUTH_READ_TOKEN", ""),

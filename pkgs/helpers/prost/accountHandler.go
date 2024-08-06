@@ -2,6 +2,7 @@ package prost
 
 import (
 	"collector/config"
+	"collector/pkgs/helpers/clients"
 	"context"
 	"crypto/ecdsa"
 	"errors"
@@ -12,6 +13,7 @@ import (
 	"math/big"
 	"strings"
 	"sync"
+	"time"
 )
 
 type Account struct {
@@ -155,6 +157,7 @@ func (account *Account) HandleTransactionError(err error, multiplier int, id str
 		log.Debugln("Retrying with gas price: ", account.auth.GasFeeCap.String())
 	} else {
 		log.Errorf("Unexpected error: %v", err)
+		clients.SendFailureNotification("HandleTransactionError", err.Error(), time.Now().String(), "High")
 	}
 	return multiplier
 }

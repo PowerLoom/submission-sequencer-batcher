@@ -96,7 +96,7 @@ func (tm *TxManager) CommitSubmissionBatch(account *Account, batch *ipfs.Batch, 
 	key := redis.BatchSubmissionKey(batch.ID.String(), nonce)
 	value := fmt.Sprintf("%s.%s.%d.%d.%s.%s.%s", tx.Hash().Hex(), cid, batch.ID, epochId, batch.Pids, batch.Cids, common.Bytes2Hex(finalizedCidsRootHash))
 	set := redis.BatchSubmissionSetByEpoch(epochId.String())
-	err = redis.SetSubmission(context.Background(), key, value, set, 2*time.Minute)
+	err = redis.SetSubmission(context.Background(), key, value, set, 5*time.Minute)
 	if err != nil {
 		log.Debugln("Redis error: ", err.Error())
 	}
