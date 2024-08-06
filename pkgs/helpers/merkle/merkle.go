@@ -145,14 +145,6 @@ func finalizeBatches(batchedKeys [][]string, epochId *big.Int, tree *imt.Increme
 
 		// Sort the projectIds to ensure the same order is followed by all the sequencers in a decentralized environment
 		sort.Strings(keys)
-
-		for _, pid := range keys {
-			pids = append(pids, pid)
-			cids = append(cids, projectMostFrequent[pid])
-		}
-
-		// Sort the projectIds to ensure the same order is followed by all the sequencers in a decentralized environment
-		sort.Strings(keys)
 		for _, pid := range keys {
 			pids = append(pids, pid)
 			cids = append(cids, projectMostFrequent[pid])
