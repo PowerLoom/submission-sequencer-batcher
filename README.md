@@ -33,7 +33,8 @@ Clone the repository against the testnet branch.
     - Optionally, you may also set the following variables:
         - `BATCH_SIZE`: The number of submissions to be included per batch.
         - `BLOCK_TIME`: The block time of the chain.
-        - `REDIS_HOST` & `REDIS_PORT`: The redis server connection url (if you wish to use a separate one).
+        - `REDIS_HOST` & `REDIS_PORT` & `REDIS_DB`: The redis server connection url (if you wish to use a separate one).
+        - `FULL_NODES`: A list of full nodes in case of fallback mode
 
 2. Build the image
 
