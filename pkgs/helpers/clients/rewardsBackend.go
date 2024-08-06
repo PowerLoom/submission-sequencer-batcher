@@ -3,6 +3,7 @@ package clients
 import (
 	"bytes"
 	"collector/config"
+	"crypto/tls"
 	"encoding/json"
 	log "github.com/sirupsen/logrus"
 	"net/http"
@@ -26,7 +27,7 @@ type UpdateSlotRewardMessage struct {
 func InitializeRewardsBackendClient(url string, timeout time.Duration) {
 	rewardsBackendClient = &RewardsBackend{
 		url:    url,
-		client: &http.Client{Timeout: timeout},
+		client: &http.Client{Timeout: timeout, Transport: &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}},
 	}
 }
 

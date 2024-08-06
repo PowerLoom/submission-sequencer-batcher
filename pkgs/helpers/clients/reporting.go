@@ -2,6 +2,7 @@ package clients
 
 import (
 	"bytes"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	log "github.com/sirupsen/logrus"
@@ -18,7 +19,7 @@ type ReportingService struct {
 
 func InitializeReportingClient(url string, timeout time.Duration) {
 	reportingClient = &ReportingService{
-		url: url, client: &http.Client{Timeout: timeout},
+		url: url, client: &http.Client{Timeout: timeout, Transport: &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}},
 	}
 }
 
