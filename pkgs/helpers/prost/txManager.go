@@ -69,47 +69,51 @@ func (tm *TxManager) CommitSubmissionBatches(batchSubmissions []*ipfs.BatchSubmi
 	defer tm.accountHandler.ReleaseAccount(account)
 
 	for _, batchSubmission := range batchSubmissions {
-		tm.CommitSubmissionBatch(account, batchSubmission.Batch, batchSubmission.Cid, batchSubmission.EpochId, batchSubmission.FinalizedCidsRootHash)
+		tm.CommitSubmissionBatch(account, batchSubmission)
 		account.UpdateAuth(1)
 	}
 }
 
-func (tm *TxManager) CommitSubmissionBatch(account *Account, batch *ipfs.Batch, cid string, epochId *big.Int, finalizedCidsRootHash []byte) {
+func (tm *TxManager) CommitSubmissionBatch(account *Account, batchSubmission *ipfs.BatchSubmission) {
 	var tx *types.Transaction
 	multiplier := 1
 	nonce := account.auth.Nonce.String()
 	var err error
 	operation := func() error {
-		tx, err = Instance.SubmitSubmissionBatch(account.auth, config.SettingsObj.DataMarketContractAddress, cid, batch.ID, epochId, batch.Pids, batch.Cids, [32]byte(finalizedCidsRootHash))
+		tx, err = Instance.SubmitSubmissionBatch(account.auth, config.SettingsObj.DataMarketContractAddress, batchSubmission.Cid, batchSubmission.Batch.ID, batchSubmission.EpochId, batchSubmission.Batch.Pids, batchSubmission.Batch.Cids, [32]byte(batchSubmission.FinalizedCidsRootHash))
 		if err != nil {
-			multiplier = account.HandleTransactionError(err, multiplier, batch.ID.String())
+			multiplier = account.HandleTransactionError(err, multiplier, batchSubmission.Batch.ID.String())
 			nonce = account.auth.Nonce.String()
 			return err
 		}
 		return nil
 	}
 	if err = backoff.Retry(operation, backoff.WithMaxRetries(backoff.NewExponentialBackOff(), 7)); err != nil {
-		clients.SendFailureNotification("CommitSubmissionBatch", fmt.Sprintf("Batch %s submission for epoch %s failed after max retries: %s", batch.ID.String(), epochId.String(), err.Error()), time.Now().String(), "High")
-		log.Debugf("Batch %s submission for epoch %s failed after max retries: ", batch.ID.String(), epochId.String())
+		clients.SendFailureNotification("CommitSubmissionBatch", fmt.Sprintf("Batch %s submission for epoch %s failed after max retries: %s", batchSubmission.Batch.ID.String(), batchSubmission.EpochId.String(), err.Error()), time.Now().String(), "High")
+		log.Debugf("Batch %s submission for epoch %s failed after max retries: ", batchSubmission.Batch.ID.String(), batchSubmission.EpochId.String())
 		return
 	}
-	key := redis.BatchSubmissionKey(batch.ID.String(), nonce)
-	value := fmt.Sprintf("%s.%s.%d.%d.%s.%s.%s", tx.Hash().Hex(), cid, batch.ID, epochId, batch.Pids, batch.Cids, common.Bytes2Hex(finalizedCidsRootHash))
-	set := redis.BatchSubmissionSetByEpoch(epochId.String())
+	key := redis.BatchSubmissionKey(batchSubmission.Batch.ID.String(), nonce)
+	batchSubmissionBytes, err := json.Marshal(batchSubmission)
+	if err != nil {
+		clients.SendFailureNotification("CommitSubmissionBatch", fmt.Sprintf("Unable to marshal ipfsBatchSubmission: %s", err.Error()), time.Now().String(), "High")
+	}
+	value := fmt.Sprintf("%s.%s", tx.Hash().Hex(), string(batchSubmissionBytes))
+	set := redis.BatchSubmissionSetByEpoch(batchSubmission.EpochId.String())
 	err = redis.SetSubmission(context.Background(), key, value, set, 5*time.Minute)
 	if err != nil {
 		log.Debugln("Redis error: ", err.Error())
 	}
-	log.Debugf("Successfully submitted batch %s with nonce %s, gasPrice %s, tx: %s\n", batch.ID.String(), nonce, account.auth.GasPrice.String(), tx.Hash().Hex())
+	log.Debugf("Successfully submitted batch %s with nonce %s, gasPrice %s, tx: %s\n", batchSubmission.Batch.ID.String(), nonce, account.auth.GasPrice.String(), tx.Hash().Hex())
 	logEntry := map[string]interface{}{
-		"epoch_id":  epochId.String(),
-		"batch_id":  batch.ID,
+		"epoch_id":  batchSubmission.EpochId.String(),
+		"batch_id":  batchSubmission.Batch.ID,
 		"tx_hash":   tx.Hash().Hex(),
 		"signer":    account.auth.From.Hex(),
 		"nonce":     nonce,
 		"timestamp": time.Now().Unix(),
 	}
-	redis.SetProcessLog(context.Background(), redis.TriggeredProcessLog(pkgs.CommitSubmissionBatch, batch.ID.String()), logEntry, 4*time.Hour)
+	redis.SetProcessLog(context.Background(), redis.TriggeredProcessLog(pkgs.CommitSubmissionBatch, batchSubmission.Batch.ID.String()), logEntry, 4*time.Hour)
 }
 
 func (tm *TxManager) BatchUpdateRewards(day *big.Int) []string {
@@ -317,9 +321,9 @@ func (tm *TxManager) EnsureBatchSubmissionSuccess(epochID *big.Int) {
 				log.Errorf("Unable to fetch value for key: %s\n", key)
 			} else {
 				vals := strings.Split(value, ".")
-				if len(vals) < 7 {
-					clients.SendFailureNotification("EnsureBatchSubmissionSuccess", fmt.Sprintf("txKey %s value in redis should have 6 parts: %s", key, value), time.Now().String(), "High")
-					log.Errorf("txKey %s value in redis should have 7 parts: %s", key, value)
+				if len(vals) < 2 {
+					clients.SendFailureNotification("EnsureBatchSubmissionSuccess", fmt.Sprintf("txKey %s value in redis should have 2 parts: %s", key, value), time.Now().String(), "High")
+					log.Errorf("txKey %s value in redis should have 2 parts: %s", key, value)
 					if _, err := redis.RedisClient.Del(context.Background(), key).Result(); err != nil {
 						log.Errorf("Unable to delete transaction from redis: %s\n", err.Error())
 					}
@@ -328,73 +332,81 @@ func (tm *TxManager) EnsureBatchSubmissionSuccess(epochID *big.Int) {
 					}
 					continue
 				}
+				batchSubmission := &ipfs.BatchSubmission{}
 				tx := vals[0]
-				cid := vals[1]
-				batchID := new(big.Int)
-				_, ok := batchID.SetString(vals[2], 10)
-				if !ok {
-					log.Errorf("Unable to convert bigInt string to bigInt: %s\n", vals[2])
+				err = json.Unmarshal([]byte(vals[1]), batchSubmission)
+				if err != nil {
+					clients.SendFailureNotification("EnsureBatchSubmissionSuccess", fmt.Sprintf("Unable to unmarshal ipfsBatchSubmission: %s", err.Error()), time.Now().String(), "High")
+					log.Errorln("Unable to unmarshal ipfsBatchSubmission: ", err.Error())
+					if _, err := redis.RedisClient.Del(context.Background(), key).Result(); err != nil {
+						log.Errorf("Unable to delete transaction from redis: %s\n", err.Error())
+					}
+					if _, err := redis.RedisClient.SRem(context.Background(), txSet, key).Result(); err != nil {
+						log.Errorf("Unable to delete transaction from transaction set: %s\n", err.Error())
+					}
+					continue
 				}
-				pids := strings.Fields(strings.Trim(vals[4], "[]"))
-				cids := strings.Fields(strings.Trim(vals[5], "[]"))
-				finalizedCidsRootHash := [32]byte(common.Hex2Bytes(vals[6]))
 				nonce := strings.Split(key, ".")[1]
 				multiplier := 1
 				if receipt, err := tm.GetTxReceipt(common.HexToHash(tx)); err != nil {
 					if receipt != nil {
 						log.Debugln("Fetched receipt for unsuccessful tx: ", receipt.Logs)
 					}
-					log.Errorf("Found unsuccessful transaction %s: %s, batchID: %d, nonce: %s", err, tx, batchID, nonce)
+					log.Errorf("Found unsuccessful transaction %s: %s, batchID: %d, nonce: %s", tx, err, batchSubmission.Batch.ID, nonce)
 					updatedNonce := account.auth.Nonce.String()
 					if err = account.UpdateGasPrice(context.Background(), multiplier); err != nil {
 						log.Debugln("Unable to update gas price: ", err.Error())
 					}
 					var reTx *types.Transaction
 					operation := func() error {
-						reTx, err = Instance.SubmitSubmissionBatch(account.auth, config.SettingsObj.DataMarketContractAddress, cid, batchID, epochID, pids, cids, finalizedCidsRootHash)
+						reTx, err = Instance.SubmitSubmissionBatch(account.auth, config.SettingsObj.DataMarketContractAddress, batchSubmission.Cid, batchSubmission.Batch.ID, epochID, batchSubmission.Batch.Pids, batchSubmission.Batch.Cids, [32]byte(batchSubmission.FinalizedCidsRootHash))
 						if err != nil {
-							multiplier = account.HandleTransactionError(err, multiplier, batchID.String())
+							multiplier = account.HandleTransactionError(err, multiplier, batchSubmission.Batch.ID.String())
 							updatedNonce = account.auth.Nonce.String()
 							return err
 						}
 						return nil
 					}
 					if err = backoff.Retry(operation, backoff.WithMaxRetries(backoff.NewExponentialBackOff(), 5)); err != nil {
-						clients.SendFailureNotification("EnsureBatchSubmissionSuccess", fmt.Sprintf("Resubmission for batch %s failed: %s", batchID.String(), err.Error()), time.Now().String(), "High")
-						log.Debugf("Resubmission for batch %s failed: ", batchID.String())
+						clients.SendFailureNotification("EnsureBatchSubmissionSuccess", fmt.Sprintf("Resubmission for batch %s failed: %s", batchSubmission.Batch.ID.String(), err.Error()), time.Now().String(), "High")
+						log.Debugf("Resubmission for batch %s failed: ", batchSubmission.Batch.ID.String())
 						return
 					}
-					txKey := redis.BatchSubmissionKey(batchID.String(), updatedNonce)
-					txValue := fmt.Sprintf("%s.%s.%d.%d.%s.%s.%s", reTx.Hash().Hex(), cid, batchID, epochID, pids, cids, common.Bytes2Hex(finalizedCidsRootHash[:]))
+					txKey := redis.BatchSubmissionKey(batchSubmission.Batch.ID.String(), updatedNonce)
+					batchSubmissionBytes, err := json.Marshal(batchSubmission)
+					if err != nil {
+						clients.SendFailureNotification("EnsureBatchSubmissionSuccess", fmt.Sprintf("Unable to marshal ipfsBatchSubmission: %s", err.Error()), time.Now().String(), "High")
+					}
+					txValue := fmt.Sprintf("%s.%s", reTx.Hash().Hex(), string(batchSubmissionBytes))
 					if err = redis.SetSubmission(context.Background(), txKey, txValue, txSet, time.Hour); err != nil {
 						log.Errorln("Redis ipfs error: ", err.Error())
 						return
 					}
 					logEntry := map[string]interface{}{
 						"epoch_id":  epochID.String(),
-						"batch_id":  batchID,
+						"batch_id":  batchSubmission.Batch.ID.String(),
 						"tx_hash":   reTx.Hash().Hex(),
 						"signer":    account.auth.From.Hex(),
 						"nonce":     updatedNonce,
 						"timestamp": time.Now().Unix(),
 					}
 
-					existingLog, _ := redis.Get(context.Background(), redis.TriggeredProcessLog(pkgs.EnsureBatchSubmissionSuccess, batchID.String()))
+					existingLog, _ := redis.Get(context.Background(), redis.TriggeredProcessLog(pkgs.EnsureBatchSubmissionSuccess, batchSubmission.Batch.ID.String()))
 					if existingLog == "" {
-						redis.SetProcessLog(context.Background(), redis.TriggeredProcessLog(pkgs.EnsureBatchSubmissionSuccess, batchID.String()), logEntry, 4*time.Hour)
+						redis.SetProcessLog(context.Background(), redis.TriggeredProcessLog(pkgs.EnsureBatchSubmissionSuccess, batchSubmission.Batch.ID.String()), logEntry, 4*time.Hour)
 					} // append to existing log entry with another log entry
 					existingEntries := make(map[string]interface{})
 					err = json.Unmarshal([]byte(existingLog), &existingEntries)
 					if err != nil {
-						clients.SendFailureNotification("UpdateBatchResubmissionProcessLog", fmt.Sprintf("Unable to unmarshal log entry for resubmission of batch %s: %s", batchID.String(), err.Error()), time.Now().String(), "High")
-						log.Errorln("Unable to unmarshal log entry for resubmission of batch: ", batchID.String())
-						redis.SetProcessLog(context.Background(), redis.TriggeredProcessLog(pkgs.EnsureBatchSubmissionSuccess, batchID.String()), logEntry, 4*time.Hour)
+						clients.SendFailureNotification("UpdateBatchResubmissionProcessLog", fmt.Sprintf("Unable to unmarshal log entry for resubmission of batch %s: %s", batchSubmission.Batch.ID.String(), err.Error()), time.Now().String(), "High")
+						log.Errorln("Unable to unmarshal log entry for resubmission of batch: ", batchSubmission.Batch.ID.String())
+						redis.SetProcessLog(context.Background(), redis.TriggeredProcessLog(pkgs.EnsureBatchSubmissionSuccess, batchSubmission.Batch.ID.String()), logEntry, 4*time.Hour)
 					} else {
 						utils.AppendToLogEntry(existingEntries, "tx_hash", reTx.Hash().Hex())
 						utils.AppendToLogEntry(existingEntries, "nonce", updatedNonce)
 						utils.AppendToLogEntry(existingEntries, "timestamp", time.Now().Unix())
 
-						redis.SetProcessLog(context.Background(), redis.TriggeredProcessLog(pkgs.EnsureBatchSubmissionSuccess, batchID.String()), existingEntries, 4*time.Hour)
+						redis.SetProcessLog(context.Background(), redis.TriggeredProcessLog(pkgs.EnsureBatchSubmissionSuccess, batchSubmission.Batch.ID.String()), existingEntries, 4*time.Hour)
 					}
 				}
 				if _, err := redis.RedisClient.Del(context.Background(), key).Result(); err != nil {
