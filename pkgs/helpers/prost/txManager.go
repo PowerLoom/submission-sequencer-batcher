@@ -97,6 +97,7 @@ func (tm *TxManager) CommitSubmissionBatch(account *Account, batchSubmission *ip
 	batchSubmissionBytes, err := json.Marshal(batchSubmission)
 	if err != nil {
 		clients.SendFailureNotification("CommitSubmissionBatch", fmt.Sprintf("Unable to marshal ipfsBatchSubmission: %s", err.Error()), time.Now().String(), "High")
+		log.Errorln("Unable to marshal ipfsBatchSubmission: ", err.Error())
 	}
 	value := fmt.Sprintf("%s.%s", tx.Hash().Hex(), string(batchSubmissionBytes))
 	set := redis.BatchSubmissionSetByEpoch(batchSubmission.EpochId.String())
