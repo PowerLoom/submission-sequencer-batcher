@@ -245,6 +245,7 @@ func BuildBatch(dataIds, data []string, id int, epochId *big.Int, tree *imt.Incr
 		log.Errorf("Error storing batch on IPFS: %d", id)
 		return nil, err
 	} else {
+		log.Debugln("Stored cid for batch ", id, cid)
 		// Set batch building success for epochId
 		logEntry := map[string]interface{}{
 			"epoch_id":          epochId.String(),
