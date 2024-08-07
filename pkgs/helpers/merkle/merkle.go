@@ -141,14 +141,13 @@ func finalizeBatches(batchedKeys [][]string, epochId *big.Int, tree *imt.Increme
 			allIds = append(allIds, idSubPair[0])
 		}
 
-		pids := []string{}
-		cids := []string{}
-
 		var keys []string
 		for pid, _ := range projectMostFrequent {
 			keys = append(keys, pid)
 		}
 
+		pids := []string{}
+		cids := []string{}
 		// Sort the projectIds to ensure the same order is followed by all the sequencers in a decentralized environment
 		sort.Strings(keys)
 		for _, pid := range keys {
@@ -161,7 +160,7 @@ func finalizeBatches(batchedKeys [][]string, epochId *big.Int, tree *imt.Increme
 		if err != nil {
 			clients.SendFailureNotification("finalizeBatches", fmt.Sprintf("Batch building error: %s", err.Error()), time.Now().String(), "High")
 			log.Errorln("Error storing the batch: ", err.Error())
-			return nil, err
+			continue
 		}
 
 		batchSubmissions = append(batchSubmissions, batchSubmission)
@@ -232,13 +231,14 @@ func arrangeKeysInBatches(keys []string) [][]string {
 }
 
 func BuildBatch(dataIds, data []string, id int, epochId *big.Int, tree *imt.IncrementalMerkleTree, pids, cids []string) (*ipfs.BatchSubmission, error) {
+	log.Debugln("Building batch for epoch: ", epochId.String())
 	var err error
 	_, err = UpdateMerkleTree(dataIds, tree)
 	if err != nil {
 		return nil, err
 	}
 	roothash := GetRootHash(tree)
-	//log.Debugln("RootHash for batch ", id, roothash)
+	log.Debugln("RootHash for batch ", id, roothash)
 	batch := &ipfs.Batch{ID: big.NewInt(int64(id)), SubmissionIds: dataIds, Submissions: data, RootHash: roothash, Pids: pids, Cids: cids}
 	if cid, err := ipfs.StoreOnIPFS(ipfs.IPFSCon, batch); err != nil {
 		clients.SendFailureNotification("Build Batch", fmt.Sprintf("Error storing batch %d on IPFS: %s", id, err.Error()), time.Now().String(), "High")
@@ -260,6 +260,7 @@ func BuildBatch(dataIds, data []string, id int, epochId *big.Int, tree *imt.Incr
 		if _, err := UpdateMerkleTree(batch.Cids, cidTree); err != nil {
 			clients.SendFailureNotification("Build Batch", fmt.Sprintf("Error updating merkle tree for batch %d: %s", id, err.Error()), time.Now().String(), "High")
 			log.Errorln("Unable to get finalized root hash: ", err.Error())
+			return nil, err
 		}
 		return &ipfs.BatchSubmission{
 			Batch:                 batch,
