@@ -336,7 +336,7 @@ func (tm *TxManager) EnsureBatchSubmissionSuccess(epochID *big.Int) {
 				tx := vals[0]
 				err = json.Unmarshal([]byte(vals[1]), batchSubmission)
 				if err != nil {
-					clients.SendFailureNotification("EnsureBatchSubmissionSuccess", fmt.Sprintf("Unable to unmarshal ipfsBatchSubmission: %s", err.Error()), time.Now().String(), "High")
+					clients.SendFailureNotification("EnsureBatchSubmissionSuccess", fmt.Sprintf("Unable to unmarshal ipfsBatchSubmission %s: %s", vals[1], err.Error()), time.Now().String(), "High")
 					log.Errorln("Unable to unmarshal ipfsBatchSubmission: ", err.Error())
 					if _, err := redis.RedisClient.Del(context.Background(), key).Result(); err != nil {
 						log.Errorf("Unable to delete transaction from redis: %s\n", err.Error())

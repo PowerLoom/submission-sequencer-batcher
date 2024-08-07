@@ -5,6 +5,7 @@ import (
 	"collector/config"
 	"crypto/tls"
 	"encoding/json"
+	"fmt"
 	log "github.com/sirupsen/logrus"
 	"net/http"
 	"time"
@@ -44,12 +45,14 @@ func AssignSlotReward(slotId, day int) {
 
 	jsonData, err := json.Marshal(payload)
 	if err != nil {
+		SendFailureNotification("AssignSlotReward", fmt.Sprintf("Error marshalling json: %s", err.Error()), time.Now().String(), "Medium")
 		log.Errorln("Error marshaling JSON:", err)
 		return
 	}
 
 	req, err := http.NewRequest("POST", config.SettingsObj.RewardsBackendUrl, bytes.NewBuffer(jsonData))
 	if err != nil {
+		SendFailureNotification("AssignSlotReward", fmt.Sprintf("Error creating request: %s", err.Error()), time.Now().String(), "Medium")
 		log.Errorln("Error creating request:", err)
 		return
 	}
@@ -58,6 +61,7 @@ func AssignSlotReward(slotId, day int) {
 
 	resp, err := rewardsBackendClient.Do(req)
 	if err != nil {
+		SendFailureNotification("AssignSlotReward", fmt.Sprintf("Error sending request: %s", err.Error()), time.Now().String(), "Medium")
 		log.Errorln("Error sending request:", err)
 		return
 	}
