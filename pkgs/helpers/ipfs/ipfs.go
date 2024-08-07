@@ -40,9 +40,10 @@ func ConnectIPFSNode() {
 		&http.Client{
 			Timeout: time.Duration(config.SettingsObj.HttpTimeout) * time.Second,
 			Transport: &http.Transport{
-				TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-				MaxIdleConns:    10,
-				IdleConnTimeout: 30 * time.Second,
+				TLSClientConfig:   &tls.Config{InsecureSkipVerify: true},
+				MaxIdleConns:      10,
+				IdleConnTimeout:   5 * time.Second,
+				DisableKeepAlives: true,
 			},
 		},
 	)

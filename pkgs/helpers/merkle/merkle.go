@@ -89,12 +89,19 @@ func finalizeBatches(batchedKeys [][]string, epochId *big.Int, tree *imt.Increme
 		allData := []string{}
 		for _, key := range batch {
 			val, err := redis.Get(context.Background(), key)
-			log.Debugln(fmt.Sprintf("Processing key %s and value %s", key, val))
 
 			if err != nil {
 				clients.SendFailureNotification("finalizeBatches", fmt.Sprintf("Error fetching data from redis: %s", err.Error()), time.Now().String(), "High")
 				log.Errorln("Error fetching data from redis: ", err.Error())
 				continue
+			}
+
+			log.Debugln(fmt.Sprintf("Processing key %s and value %s", key, val))
+
+			if len(val) == 0 {
+				clients.SendFailureNotification("finalizeBatches", fmt.Sprintf("Value has expired for key: %s", key), time.Now().String(), "High")
+				log.Errorln("Value has expired for key:  ", key)
+				return nil, errors.New(fmt.Sprintf("Value has expired for key: %s", key))
 			}
 
 			parts := strings.Split(key, ".")

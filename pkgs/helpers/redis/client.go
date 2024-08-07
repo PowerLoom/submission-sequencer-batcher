@@ -101,7 +101,7 @@ func SetProcessLog(ctx context.Context, key string, logEntry map[string]interfac
 }
 
 func GetValidSubmissionKeys(ctx context.Context, epochID *big.Int, headers []string) ([]string, error) {
-	var allKeys []string
+	allKeys := []string{}
 	for _, header := range headers {
 		keys := RedisClient.SMembers(ctx, SubmissionSetByHeaderKey(epochID.Uint64(), header)).Val()
 		if len(keys) > 0 {
