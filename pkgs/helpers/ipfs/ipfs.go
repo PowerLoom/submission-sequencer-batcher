@@ -9,6 +9,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"math/big"
 	"net/http"
+	"time"
 )
 
 var IPFSCon *shell.Shell
@@ -33,7 +34,7 @@ type BatchSubmission struct {
 // Connect to the local IPFS node
 func ConnectIPFSNode() {
 	log.Debugf("Connecting to IPFS host: %s", config.SettingsObj.IPFSUrl)
-	IPFSCon = shell.NewShellWithClient(config.SettingsObj.IPFSUrl, &http.Client{Transport: &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}})
+	IPFSCon = shell.NewShellWithClient(config.SettingsObj.IPFSUrl, &http.Client{Timeout: time.Duration(config.SettingsObj.HttpTimeout), Transport: &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}})
 }
 
 func StoreOnIPFS(sh *shell.Shell, data *Batch) (string, error) {
