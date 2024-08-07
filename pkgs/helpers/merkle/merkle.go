@@ -54,6 +54,7 @@ func BuildBatchSubmissions(epochId *big.Int, headers []string) ([]*ipfs.BatchSub
 
 	tree, err := imt.New()
 	if err != nil {
+		clients.SendFailureNotification("BuildBatchSubmissions", fmt.Sprintf("Error creating submissions ID merkle tree: %s\n", err.Error()), time.Now().String(), "High")
 		log.Errorf("Error creating submissions ID merkle tree: %s\n", err.Error())
 		return nil, err
 	}
@@ -66,6 +67,7 @@ func BuildBatchSubmissions(epochId *big.Int, headers []string) ([]*ipfs.BatchSub
 	batchSubmissions, err := finalizeBatches(batchedKeys, epochId, tree)
 
 	if err != nil {
+		clients.SendFailureNotification("BuildBatchSubmissions", fmt.Sprintf("Batch finalization error: %s", err.Error()), time.Now().String(), "High")
 		log.Errorln("Batch finalization error: ", err.Error())
 	}
 
@@ -90,12 +92,14 @@ func finalizeBatches(batchedKeys [][]string, epochId *big.Int, tree *imt.Increme
 			log.Debugln(fmt.Sprintf("Processing key %s and value %s", key, val))
 
 			if err != nil {
+				clients.SendFailureNotification("finalizeBatches", fmt.Sprintf("Error fetching data from redis: %s", err.Error()), time.Now().String(), "High")
 				log.Errorln("Error fetching data from redis: ", err.Error())
 				continue
 			}
 
 			parts := strings.Split(key, ".")
 			if len(parts) != 3 {
+				clients.SendFailureNotification("finalizeBatches", fmt.Sprintf("Key should have three parts, invalid key: %s", key), time.Now().String(), "High")
 				log.Errorln("Key should have three parts, invalid key: ", key)
 				continue // skip malformed keys
 			}
@@ -108,6 +112,7 @@ func finalizeBatches(batchedKeys [][]string, epochId *big.Int, tree *imt.Increme
 
 			idSubPair := strings.Split(val, ".")
 			if len(idSubPair) != 2 {
+				clients.SendFailureNotification("finalizeBatches", fmt.Sprintf("Value should have two parts, invalid value: %s", val), time.Now().String(), "High")
 				log.Errorln("Value should have two parts, invalid value: ", val)
 				continue // skip malformed keys
 			}
@@ -116,6 +121,7 @@ func finalizeBatches(batchedKeys [][]string, epochId *big.Int, tree *imt.Increme
 			//value := utils.ExtractField(idSubPair[1], "snapshotCid")
 			err = protojson.Unmarshal([]byte(idSubPair[1]), &subHolder)
 			if err != nil {
+				clients.SendFailureNotification("finalizeBatches", fmt.Sprintf("Unmarshalling %s error: %s", idSubPair[1], err.Error()), time.Now().String(), "High")
 				log.Errorln("Unable to unmarshal submission: ", err)
 				continue
 			}
@@ -153,6 +159,7 @@ func finalizeBatches(batchedKeys [][]string, epochId *big.Int, tree *imt.Increme
 		log.Debugln("PIDs and CIDs for epoch: ", epochId, pids, cids)
 		batchSubmission, err := BuildBatch(allIds, allData, BatchId, epochId, tree, pids, cids)
 		if err != nil {
+			clients.SendFailureNotification("finalizeBatches", fmt.Sprintf("Batch building error: %s", err.Error()), time.Now().String(), "High")
 			log.Errorln("Error storing the batch: ", err.Error())
 			return nil, err
 		}

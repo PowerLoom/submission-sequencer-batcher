@@ -2,7 +2,9 @@ package prost
 
 import (
 	"collector/config"
+	"collector/pkgs"
 	"collector/pkgs/contract"
+	"collector/pkgs/helpers/redis"
 	"context"
 	"crypto/tls"
 	"github.com/ethereum/go-ethereum/accounts/abi"
@@ -71,6 +73,8 @@ func StartFetchingBlocks() {
 			}
 
 			CurrentBlock = block
+			redis.Set(context.Background(), pkgs.SequencerCurrentBlockNumber, CurrentBlock.Number().String(), 0)
+
 			log.Debugln("Processing block: ", CurrentBlock.Number().String())
 
 			// Process events in the block.

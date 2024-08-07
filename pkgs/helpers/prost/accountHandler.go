@@ -6,6 +6,7 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"errors"
+	"fmt"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -15,6 +16,8 @@ import (
 	"sync"
 	"time"
 )
+
+var ProcessesOnHold = 0
 
 type Account struct {
 	auth       *bind.TransactOpts
@@ -114,10 +117,18 @@ func (ah *AccountHandler) GetFreeAccount() *Account {
 			if account.mu.TryLock() {
 				account.SetupAuth()
 				log.Debugln("Locking account: ", account.address.Hex())
+				if ProcessesOnHold > 0 {
+					ProcessesOnHold -= 1
+				}
 				return account
 			}
 		}
 		log.Debugln("All accounts are occupied - waiting")
+		ProcessesOnHold += 1
+		if ProcessesOnHold > 2 {
+			log.Errorf("%d Processes on hold: all accounts are occupied", ProcessesOnHold)
+			clients.SendFailureNotification("GetFreeAccount", fmt.Sprintf("%d Processes on hold: all accounts are occupied", ProcessesOnHold), time.Now().String(), "High")
+		}
 		ah.cond.L.Lock()
 		ah.cond.Wait()
 		ah.cond.L.Unlock()
