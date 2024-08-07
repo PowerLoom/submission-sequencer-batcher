@@ -395,19 +395,20 @@ func (tm *TxManager) EnsureBatchSubmissionSuccess(epochID *big.Int) {
 					existingLog, _ := redis.Get(context.Background(), redis.TriggeredProcessLog(pkgs.EnsureBatchSubmissionSuccess, batchSubmission.Batch.ID.String()))
 					if existingLog == "" {
 						redis.SetProcessLog(context.Background(), redis.TriggeredProcessLog(pkgs.EnsureBatchSubmissionSuccess, batchSubmission.Batch.ID.String()), logEntry, 4*time.Hour)
-					} // append to existing log entry with another log entry
-					existingEntries := make(map[string]interface{})
-					err = json.Unmarshal([]byte(existingLog), &existingEntries)
-					if err != nil {
-						clients.SendFailureNotification("UpdateBatchResubmissionProcessLog", fmt.Sprintf("Unable to unmarshal log entry for resubmission of batch %s: %s", batchSubmission.Batch.ID.String(), err.Error()), time.Now().String(), "High")
-						log.Errorln("Unable to unmarshal log entry for resubmission of batch: ", batchSubmission.Batch.ID.String())
-						redis.SetProcessLog(context.Background(), redis.TriggeredProcessLog(pkgs.EnsureBatchSubmissionSuccess, batchSubmission.Batch.ID.String()), logEntry, 4*time.Hour)
-					} else {
-						utils.AppendToLogEntry(existingEntries, "tx_hash", reTx.Hash().Hex())
-						utils.AppendToLogEntry(existingEntries, "nonce", updatedNonce)
-						utils.AppendToLogEntry(existingEntries, "timestamp", time.Now().Unix())
+					} else { // append to existing log entry with another log entry
+						existingEntries := make(map[string]interface{})
+						err = json.Unmarshal([]byte(existingLog), &existingEntries)
+						if err != nil {
+							clients.SendFailureNotification("UpdateBatchResubmissionProcessLog", fmt.Sprintf("Unable to unmarshal log entry for resubmission of batch %s: %s", batchSubmission.Batch.ID.String(), err.Error()), time.Now().String(), "High")
+							log.Errorln("Unable to unmarshal log entry for resubmission of batch: ", batchSubmission.Batch.ID.String())
+							redis.SetProcessLog(context.Background(), redis.TriggeredProcessLog(pkgs.EnsureBatchSubmissionSuccess, batchSubmission.Batch.ID.String()), logEntry, 4*time.Hour)
+						} else {
+							utils.AppendToLogEntry(existingEntries, "tx_hash", reTx.Hash().Hex())
+							utils.AppendToLogEntry(existingEntries, "nonce", updatedNonce)
+							utils.AppendToLogEntry(existingEntries, "timestamp", time.Now().Unix())
 
-						redis.SetProcessLog(context.Background(), redis.TriggeredProcessLog(pkgs.EnsureBatchSubmissionSuccess, batchSubmission.Batch.ID.String()), existingEntries, 4*time.Hour)
+							redis.SetProcessLog(context.Background(), redis.TriggeredProcessLog(pkgs.EnsureBatchSubmissionSuccess, batchSubmission.Batch.ID.String()), existingEntries, 4*time.Hour)
+						}
 					}
 				}
 				if _, err := redis.RedisClient.Del(context.Background(), key).Result(); err != nil {
