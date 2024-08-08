@@ -7,10 +7,12 @@ import (
 	"collector/pkgs/helpers/merkle"
 	"collector/pkgs/helpers/redis"
 	"context"
+	"fmt"
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/core/types"
 	log "github.com/sirupsen/logrus"
 	"math/big"
+	"strconv"
 	"time"
 )
 
@@ -98,6 +100,14 @@ func triggerCollectionFlow(epochID *big.Int, headers []string, day *big.Int) {
 		time.Sleep(time.Second * time.Duration(config.SettingsObj.BlockTime*len(batchSubmissions)))
 		log.Debugln("Verifying all batch submissions")
 		txManager.EnsureBatchSubmissionSuccess(epochID)
+		if count, err := redis.Get(context.Background(), redis.TransactionReceiptCountByEvent(epochID.String())); err != nil && count != "" {
+			log.Debugf("Transaction receipt fetches for epoch %s: %s", epochID.String(), count)
+			n, _ := strconv.Atoi(count)
+			if n > len(batchSubmissions)*3 { // giving upto 3 retries per txn
+				clients.SendFailureNotification("EnsureBatchSubmissionSuccess", fmt.Sprintf("Too many transaction receipts fetched for epoch %s: %s", epochID.String(), count), time.Now().String(), "Medium")
+			}
+		}
+		redis.Delete(context.Background(), redis.TransactionReceiptCountByEvent(epochID.String()))
 		UpdateSubmissionCounts(batchSubmissions, day)
 		txManager.EndBatchSubmissionsForEpoch(epochID)
 	}

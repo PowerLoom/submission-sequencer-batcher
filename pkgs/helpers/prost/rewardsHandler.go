@@ -50,6 +50,14 @@ func CalculateAndStoreRewards(day, slotId *big.Int) {
 func UpdateRewards(day *big.Int) {
 	slots := txManager.BatchUpdateRewards(day)
 	txManager.EnsureRewardUpdateSuccess(day)
+	if count, err := redis.Get(context.Background(), redis.TransactionReceiptCountByEvent(day.String())); err != nil && count != "" {
+		log.Debugf("Transaction receipt fetches for day %s: %s", day.String(), count)
+		n, _ := strconv.Atoi(count)
+		if n > (len(slots)/config.SettingsObj.BatchSize)*3 { // giving upto 3 retries per txn
+			clients.SendFailureNotification("EnsureRewardUpdateSuccess", fmt.Sprintf("Too many transaction receipts fetched for day %s: %s", day.String(), count), time.Now().String(), "Medium")
+		}
+	}
+	redis.Delete(context.Background(), redis.TransactionReceiptCountByEvent(day.String()))
 
 	var wg sync.WaitGroup
 	maxConcurrency := 10

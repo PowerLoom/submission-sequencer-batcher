@@ -9,6 +9,11 @@ func SubmissionSetByHeaderKey(epoch uint64, header string) string {
 	return fmt.Sprintf("%s.%d.%s", pkgs.CollectorKey, epoch, header)
 }
 
+// TransactionReceiptCountByEvent Event can be any kind of indentifier eg. epochId/day
+func TransactionReceiptCountByEvent(event string) string {
+	return fmt.Sprintf("%s.%s", pkgs.TransactionReceiptCount, event)
+}
+
 func TriggeredProcessLog(process, identifier string) string {
 	return fmt.Sprintf("%s.%s.%s", pkgs.ProcessTriggerKey, process, identifier)
 }

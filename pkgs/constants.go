@@ -16,6 +16,7 @@ const (
 // General Key Constants
 const (
 	CurrentEpoch                = "CurrentEpochID"
+	TransactionReceiptCount     = "TransactionReceiptCount"
 	SequencerCurrentBlockNumber = "SequencerState.CurrentBlockNumber"
 	CollectorKey                = "SnapshotCollector"
 	TxsKey                      = "SnapshotTransactions"

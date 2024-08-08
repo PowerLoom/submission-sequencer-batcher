@@ -53,11 +53,16 @@ func (tm *TxManager) EndBatchSubmissionsForEpoch(epochId *big.Int) {
 	}
 }
 
-func (tm *TxManager) GetTxReceipt(txHash common.Hash) (*types.Receipt, error) {
+func (tm *TxManager) GetTxReceipt(txHash common.Hash, identifier string) (*types.Receipt, error) {
 	var receipt *types.Receipt
 	var err error
 	err = backoff.Retry(func() error {
 		receipt, err = Client.TransactionReceipt(context.Background(), txHash)
+		err = redis.RedisClient.Incr(context.Background(), redis.TransactionReceiptCountByEvent(identifier)).Err()
+		if err != nil {
+			clients.SendFailureNotification("GetTxReceipt", fmt.Sprintf("Failed to increment txreceipt count in Redis: %s", err.Error()), time.Now().String(), "Low")
+			log.Errorf("Failed to increment txreceipt count in Redis: %s", err.Error())
+		}
 		return err
 	}, backoff.WithMaxRetries(backoff.NewExponentialBackOff(), 7))
 
@@ -249,7 +254,7 @@ func (tm *TxManager) EnsureRewardUpdateSuccess(day *big.Int) {
 		}
 		for _, hash := range hashes {
 			multiplier := 1
-			if receipt, err := tm.GetTxReceipt(common.HexToHash(hash)); err != nil {
+			if receipt, err := tm.GetTxReceipt(common.HexToHash(hash), day.String()); err != nil {
 				if receipt != nil {
 					log.Debugln("Fetched receipt for unsuccessful tx: ", receipt.Logs)
 				}
@@ -349,7 +354,7 @@ func (tm *TxManager) EnsureBatchSubmissionSuccess(epochID *big.Int) {
 				}
 				nonce := strings.Split(key, ".")[1]
 				multiplier := 1
-				if receipt, err := tm.GetTxReceipt(common.HexToHash(tx)); err != nil {
+				if receipt, err := tm.GetTxReceipt(common.HexToHash(tx), epochID.String()); err != nil {
 					if receipt != nil {
 						log.Debugln("Fetched receipt for unsuccessful tx: ", receipt.Logs)
 					}
