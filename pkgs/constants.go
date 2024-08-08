@@ -15,26 +15,27 @@ const (
 
 // General Key Constants
 const (
-	RewardsBackendFailures      = "RewardsBackendFailures"
-	CurrentEpoch                = "CurrentEpochID"
-	TransactionReceiptCount     = "TransactionReceiptCount"
-	SequencerCurrentBlockNumber = "SequencerState.CurrentBlockNumber"
-	CollectorKey                = "SnapshotCollector"
-	TxsKey                      = "SnapshotTransactions"
-	TimeSlotKey                 = "TimeSlotPreference"
-	SlotSubmissionsKey          = "SlotSubmissionsKey"
-	DaySubmissionsKey           = "DaySubmissionsKey"
-	Day                         = 24 * time.Hour
-	RewardTxKey                 = "RewardTx"
-	DayBuffer                   = 0
-	EpochsPerDay                = 3
-	DailyRewardPointsKey        = "DailyRewardPointsKey"
-	TotalRewardPointsKey        = "TotalRewardPointsKey"
-	TaskCompletionKey           = "TaskCompletionKey"
-	SlotStreakKey               = "SlotStreakKey"
-	DayCounterKey               = "DayCounterKey"
-	EpochSubmissionsCountKey    = "EpochSubmissionsCountKey"
-	EpochSubmissionsKey         = "EpochSubmissionsKey"
-	ProcessTriggerKey           = "TriggeredSequencerProcess"
-	SequencerDayKey             = "SequencerState.Day"
+	PermissibleBatchesPerAccount = 25
+	RewardsBackendFailures       = "RewardsBackendFailures"
+	CurrentEpoch                 = "CurrentEpochID"
+	TransactionReceiptCount      = "TransactionReceiptCount"
+	SequencerCurrentBlockNumber  = "SequencerState.CurrentBlockNumber"
+	CollectorKey                 = "SnapshotCollector"
+	TxsKey                       = "SnapshotTransactions"
+	TimeSlotKey                  = "TimeSlotPreference"
+	SlotSubmissionsKey           = "SlotSubmissionsKey"
+	DaySubmissionsKey            = "DaySubmissionsKey"
+	Day                          = 24 * time.Hour
+	RewardTxKey                  = "RewardTx"
+	DayBuffer                    = 0
+	EpochsPerDay                 = 3
+	DailyRewardPointsKey         = "DailyRewardPointsKey"
+	TotalRewardPointsKey         = "TotalRewardPointsKey"
+	TaskCompletionKey            = "TaskCompletionKey"
+	SlotStreakKey                = "SlotStreakKey"
+	DayCounterKey                = "DayCounterKey"
+	EpochSubmissionsCountKey     = "EpochSubmissionsCountKey"
+	EpochSubmissionsKey          = "EpochSubmissionsKey"
+	ProcessTriggerKey            = "TriggeredSequencerProcess"
+	SequencerDayKey              = "SequencerState.Day"
 )

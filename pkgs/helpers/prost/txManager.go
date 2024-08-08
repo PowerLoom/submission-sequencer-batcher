@@ -18,6 +18,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -34,7 +35,7 @@ func InitializeTxManager() {
 }
 
 func (tm *TxManager) EndBatchSubmissionsForEpoch(epochId *big.Int) {
-	account := tm.accountHandler.GetFreeAccount()
+	account := tm.accountHandler.GetFreeAccount(true)
 	defer tm.accountHandler.ReleaseAccount(account)
 	multiplier := 1
 	var err error
@@ -70,13 +71,63 @@ func (tm *TxManager) GetTxReceipt(txHash common.Hash, identifier string) (*types
 }
 
 func (tm *TxManager) CommitSubmissionBatches(batchSubmissions []*ipfs.BatchSubmission) {
-	account := tm.accountHandler.GetFreeAccount()
-	defer tm.accountHandler.ReleaseAccount(account)
+	var wg sync.WaitGroup
+	accounts := []*Account{}
+	var requiredAccounts int
 
-	for _, batchSubmission := range batchSubmissions {
-		tm.CommitSubmissionBatch(account, batchSubmission)
-		account.UpdateAuth(1)
+	batchDivision := len(batchSubmissions) / pkgs.PermissibleBatchesPerAccount
+	if len(batchSubmissions)%pkgs.PermissibleBatchesPerAccount == 0 {
+		requiredAccounts = batchDivision
+	} else {
+		requiredAccounts = batchDivision + 1
 	}
+
+	// try to get required free accounts
+	for i := 0; i < requiredAccounts; i++ {
+		if account := tm.accountHandler.GetFreeAccount(false); account != nil {
+			accounts = append(accounts, account)
+		}
+	}
+
+	if len(accounts) == 0 {
+		log.Warnln("All accounts are occupied, waiting for one account and proceeding with batch submissions")
+		accounts = append(accounts, tm.accountHandler.GetFreeAccount(true))
+	}
+
+	// divide evenly among available accounts
+	batchesPerAccount := len(batchSubmissions) / len(accounts)
+	var begin, end int
+	// send asynchronous batch submissions
+	for i := 0; i < len(accounts); i++ {
+		account := accounts[i]
+
+		begin = i * batchesPerAccount
+		if i == len(accounts)-1 {
+			end = len(batchSubmissions)
+		} else {
+			end = (i + 1) * batchesPerAccount
+		}
+		batch := batchSubmissions[begin:end]
+
+		wg.Add(1)
+
+		// Process the batch asynchronously
+		go func(acc *Account, submissions []*ipfs.BatchSubmission) {
+			defer wg.Done()
+
+			// Commit each submission batch in the current batch
+			for _, batchSubmission := range submissions {
+				tm.CommitSubmissionBatch(acc, batchSubmission)
+				acc.UpdateAuth(1)
+			}
+
+			// Release the account after processing the batch
+			tm.accountHandler.ReleaseAccount(acc)
+		}(account, batch)
+	}
+
+	// Wait for all goroutines to complete
+	wg.Wait()
 }
 
 func (tm *TxManager) CommitSubmissionBatch(account *Account, batchSubmission *ipfs.BatchSubmission) {
@@ -132,7 +183,7 @@ func (tm *TxManager) BatchUpdateRewards(day *big.Int) []string {
 	batchSize := config.SettingsObj.BatchSize
 	submittedSlots := []string{}
 
-	account := tm.accountHandler.GetFreeAccount()
+	account := tm.accountHandler.GetFreeAccount(true)
 	defer tm.accountHandler.ReleaseAccount(account)
 
 	slotSubmissionCounts := redis.GetSetKeys(context.Background(), redis.SlotSubmissionSetByDay(day.String()))
@@ -255,7 +306,7 @@ func (tm *TxManager) UpdateRewards(account *Account, slotIds, submissions []*big
 }
 
 func (tm *TxManager) EnsureRewardUpdateSuccess(day *big.Int) {
-	account := tm.accountHandler.GetFreeAccount()
+	account := tm.accountHandler.GetFreeAccount(true)
 	defer tm.accountHandler.ReleaseAccount(account)
 	for {
 		hashes := redis.GetSetKeys(context.Background(), redis.RewardUpdateSetByDay(day.String()))
@@ -325,7 +376,7 @@ func (tm *TxManager) EnsureRewardUpdateSuccess(day *big.Int) {
 // todo: notify failed tx
 // TODO: An endpoint is required for getting past batch submissions for 1 hour, do not delete all transactions
 func (tm *TxManager) EnsureBatchSubmissionSuccess(epochID *big.Int) {
-	account := tm.accountHandler.GetFreeAccount()
+	account := tm.accountHandler.GetFreeAccount(true)
 	defer tm.accountHandler.ReleaseAccount(account)
 
 	txSet := redis.BatchSubmissionSetByEpoch(epochID.String())
