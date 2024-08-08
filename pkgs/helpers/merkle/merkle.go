@@ -191,7 +191,10 @@ func finalizeBatches(batchedKeys [][]string, epochId *big.Int, tree *imt.Increme
 		"timestamp":               time.Now().Unix(),
 	}
 
-	redis.SetProcessLog(context.Background(), redis.TriggeredProcessLog(pkgs.FinalizeBatches, epochId.String()), logEntry, 4*time.Hour)
+	if err := redis.SetProcessLog(context.Background(), redis.TriggeredProcessLog(pkgs.FinalizeBatches, epochId.String()), logEntry, 4*time.Hour); err != nil {
+		clients.SendFailureNotification("finalizeBatches", err.Error(), time.Now().String(), "High")
+		log.Errorln("finalizeBatches process log error: ", err.Error())
+	}
 
 	return batchSubmissions, nil
 }
@@ -263,7 +266,11 @@ func BuildBatch(dataIds, data []string, id int, epochId *big.Int, tree *imt.Incr
 			"timestamp":         time.Now().Unix(),
 		}
 
-		redis.SetProcessLog(context.Background(), redis.TriggeredProcessLog(pkgs.BuildBatch, strconv.Itoa(id)), logEntry, 4*time.Hour)
+		if err = redis.SetProcessLog(context.Background(), redis.TriggeredProcessLog(pkgs.BuildBatch, strconv.Itoa(id)), logEntry, 4*time.Hour); err != nil {
+			clients.SendFailureNotification("BuildBatch", err.Error(), time.Now().String(), "High")
+			log.Errorln("BuildBatch process log error: ", err.Error())
+		}
+
 		cidTree, _ := imt.New()
 		if _, err := UpdateMerkleTree(batch.Cids, cidTree); err != nil {
 			clients.SendFailureNotification("Build Batch", fmt.Sprintf("Error updating merkle tree for batch %d: %s", id, err.Error()), time.Now().String(), "High")

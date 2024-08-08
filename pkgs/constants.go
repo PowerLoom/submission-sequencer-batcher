@@ -15,6 +15,7 @@ const (
 
 // General Key Constants
 const (
+	RewardsBackendFailures      = "RewardsBackendFailures"
 	CurrentEpoch                = "CurrentEpochID"
 	TransactionReceiptCount     = "TransactionReceiptCount"
 	SequencerCurrentBlockNumber = "SequencerState.CurrentBlockNumber"

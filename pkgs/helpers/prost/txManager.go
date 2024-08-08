@@ -108,6 +108,7 @@ func (tm *TxManager) CommitSubmissionBatch(account *Account, batchSubmission *ip
 	set := redis.BatchSubmissionSetByEpoch(batchSubmission.EpochId.String())
 	err = redis.SetSubmission(context.Background(), key, value, set, 5*time.Minute)
 	if err != nil {
+		clients.SendFailureNotification("Redis error", err.Error(), time.Now().String(), "High")
 		log.Debugln("Redis error: ", err.Error())
 	}
 	log.Debugf("Successfully submitted batch %s with nonce %s, gasPrice %s, tx: %s\n", batchSubmission.Batch.ID.String(), nonce, account.auth.GasPrice.String(), tx.Hash().Hex())
@@ -119,7 +120,10 @@ func (tm *TxManager) CommitSubmissionBatch(account *Account, batchSubmission *ip
 		"nonce":     nonce,
 		"timestamp": time.Now().Unix(),
 	}
-	redis.SetProcessLog(context.Background(), redis.TriggeredProcessLog(pkgs.CommitSubmissionBatch, batchSubmission.Batch.ID.String()), logEntry, 4*time.Hour)
+	if err = redis.SetProcessLog(context.Background(), redis.TriggeredProcessLog(pkgs.CommitSubmissionBatch, batchSubmission.Batch.ID.String()), logEntry, 4*time.Hour); err != nil {
+		clients.SendFailureNotification("CommitSubmissionBatch", err.Error(), time.Now().String(), "High")
+		log.Errorf("CommitSubmissionBatch process log error: %s ", err.Error())
+	}
 }
 
 func (tm *TxManager) BatchUpdateRewards(day *big.Int) []string {
@@ -135,9 +139,11 @@ func (tm *TxManager) BatchUpdateRewards(day *big.Int) []string {
 	for _, key := range slotSubmissionCounts {
 		val, err := redis.Get(context.Background(), key)
 		if err != nil {
+			clients.SendFailureNotification("BatchUpdateRewards", fmt.Sprintf("Reward updates redis error: %s", err.Error()), time.Now().String(), "Medium")
 			log.Errorln("Reward updates redis error: ", err.Error())
 			continue
 		} else if val == "" {
+			clients.SendFailureNotification("BatchUpdateRewards", fmt.Sprintf("Missing data entry in redis for key: %s", key), time.Now().String(), "Medium")
 			log.Errorln("Missing data entry in redis for key: ", key)
 			continue
 		}
@@ -218,6 +224,7 @@ func (tm *TxManager) UpdateRewards(account *Account, slotIds, submissions []*big
 	redis.AddToSet(context.Background(), redis.RewardUpdateSetByDay(day.String()), tx.Hash().Hex())
 	redis.AddToSet(context.Background(), redis.RewardTxSlots(tx.Hash().Hex()), slotIdStrings...)
 	redis.AddToSet(context.Background(), redis.RewardTxSubmissions(tx.Hash().Hex()), submissionStrings...)
+
 	log.Debugf("Successfully updated batch rewards: %s", tx.Hash().Hex())
 
 	// Store log entry for reward updates
@@ -241,7 +248,10 @@ func (tm *TxManager) UpdateRewards(account *Account, slotIds, submissions []*big
 
 	logEntries[tx.Hash().Hex()] = logEntry
 
-	redis.SetProcessLog(context.Background(), redis.TriggeredProcessLog(pkgs.UpdateRewards, day.String()), logEntries, 4*time.Hour)
+	if err = redis.SetProcessLog(context.Background(), redis.TriggeredProcessLog(pkgs.UpdateRewards, day.String()), logEntries, 4*time.Hour); err != nil {
+		clients.SendFailureNotification("UpdateRewards", err.Error(), time.Now().String(), "High")
+		log.Errorf("UpdateRewards process log error: %s ", err.Error())
+	}
 }
 
 func (tm *TxManager) EnsureRewardUpdateSuccess(day *big.Int) {
@@ -255,8 +265,9 @@ func (tm *TxManager) EnsureRewardUpdateSuccess(day *big.Int) {
 		for _, hash := range hashes {
 			multiplier := 1
 			if receipt, err := tm.GetTxReceipt(common.HexToHash(hash), day.String()); err != nil {
-				if receipt != nil {
-					log.Debugln("Fetched receipt for unsuccessful tx: ", receipt.Logs)
+				if receipt != nil && receipt.Status == types.ReceiptStatusFailed {
+					clients.SendFailureNotification("EnsureRewardUpdateSuccess", fmt.Sprintf("GetTxReceipt error for %s : %s", hash, err.Error()), time.Now().String(), "Low")
+					log.Debugf("GetTxReceipt error for tx %s: %s", hash, err.Error())
 				}
 				log.Errorf("Found unsuccessful transaction %s, err: %s", hash, err.Error())
 				slotIdStrings := redis.GetSetKeys(context.Background(), redis.RewardTxSlots(hash))
@@ -298,6 +309,11 @@ func (tm *TxManager) EnsureRewardUpdateSuccess(day *big.Int) {
 				redis.AddToSet(context.Background(), redis.RewardUpdateSetByDay(day.String()), reTx.Hash().Hex())
 				redis.AddToSet(context.Background(), redis.RewardTxSlots(reTx.Hash().Hex()), slotIdStrings...)
 				redis.AddToSet(context.Background(), redis.RewardTxSubmissions(reTx.Hash().Hex()), submissionStrings...)
+			} else {
+				if receipt != nil && receipt.Status == types.ReceiptStatusFailed {
+					clients.SendFailureNotification("EnsureRewardUpdateSuccess", fmt.Sprintf("UpdateRewards execution failed: %s", hash), time.Now().String(), "Low")
+					log.Debugln("Fetched receipt for unsuccessful tx: ", receipt.Logs)
+				}
 			}
 			redis.RemoveFromSet(context.Background(), redis.RewardUpdateSetByDay(day.String()), hash)
 			redis.Delete(context.Background(), redis.RewardTxSlots(hash))
@@ -306,6 +322,7 @@ func (tm *TxManager) EnsureRewardUpdateSuccess(day *big.Int) {
 	}
 }
 
+// todo: notify failed tx
 // TODO: An endpoint is required for getting past batch submissions for 1 hour, do not delete all transactions
 func (tm *TxManager) EnsureBatchSubmissionSuccess(epochID *big.Int) {
 	account := tm.accountHandler.GetFreeAccount()
@@ -324,6 +341,7 @@ func (tm *TxManager) EnsureBatchSubmissionSuccess(epochID *big.Int) {
 		log.Debugf("Fetched %d transactions for epoch %d", len(keys), epochID)
 		for _, key := range keys {
 			if value, err := redis.Get(context.Background(), key); err != nil {
+				clients.SendFailureNotification("EnsureBatchSubmissionSuccess", fmt.Sprintf("Unable to fetch value for key: %s\n", key), time.Now().String(), "High")
 				log.Errorf("Unable to fetch value for key: %s\n", key)
 			} else {
 				vals := strings.Split(value, ".")
@@ -356,7 +374,8 @@ func (tm *TxManager) EnsureBatchSubmissionSuccess(epochID *big.Int) {
 				multiplier := 1
 				if receipt, err := tm.GetTxReceipt(common.HexToHash(tx), epochID.String()); err != nil {
 					if receipt != nil {
-						log.Debugln("Fetched receipt for unsuccessful tx: ", receipt.Logs)
+						clients.SendFailureNotification("EnsureBatchSubmissionSuccess", fmt.Sprintf("GetTxReceipt error for %s : %s", tx, err.Error()), time.Now().String(), "Low")
+						log.Debugf("GetTxReceipt error for tx %s: %s", tx, err.Error())
 					}
 					log.Errorf("Found unsuccessful transaction %s: %s, batchID: %d, nonce: %s", tx, err, batchSubmission.Batch.ID, nonce)
 					updatedNonce := account.auth.Nonce.String()
@@ -385,6 +404,7 @@ func (tm *TxManager) EnsureBatchSubmissionSuccess(epochID *big.Int) {
 					}
 					txValue := fmt.Sprintf("%s.%s", reTx.Hash().Hex(), string(batchSubmissionBytes))
 					if err = redis.SetSubmission(context.Background(), txKey, txValue, txSet, time.Hour); err != nil {
+						clients.SendFailureNotification("Redis error", err.Error(), time.Now().String(), "High")
 						log.Errorln("Redis ipfs error: ", err.Error())
 						return
 					}
@@ -414,6 +434,11 @@ func (tm *TxManager) EnsureBatchSubmissionSuccess(epochID *big.Int) {
 
 							redis.SetProcessLog(context.Background(), redis.TriggeredProcessLog(pkgs.EnsureBatchSubmissionSuccess, batchSubmission.Batch.ID.String()), existingEntries, 4*time.Hour)
 						}
+					}
+				} else {
+					if receipt != nil && receipt.Status == types.ReceiptStatusFailed {
+						clients.SendFailureNotification("EnsureBatchSubmissionSuccess", fmt.Sprintf(fmt.Sprintf("BatchSubmissionSuccess execution failed: %s", tx)), time.Now().String(), "Low")
+						log.Debugln("Fetched receipt for unsuccessful tx: ", tx)
 					}
 				}
 				if _, err := redis.RedisClient.Del(context.Background(), key).Result(); err != nil {

@@ -34,6 +34,7 @@ func CalculateAndStoreRewards(day, slotId *big.Int) {
 		if slotRewardPoints, err = MustQuery[*big.Int](context.Background(), func() (*big.Int, error) {
 			return Instance.SlotRewardPoints(&bind.CallOpts{}, config.SettingsObj.DataMarketContractAddress, slotId)
 		}); err != nil {
+			clients.SendFailureNotification("CalculateAndStoreRewards", fmt.Sprintf("Unable to query SlotRewardPoints for slot %s from contract: %s\n", slotId.String(), err.Error()), time.Now().String(), "High")
 			log.Errorf("Unable to query SlotRewardPoints for slot %s from contract: %s\n", slotId.String(), err.Error())
 			redis.Delete(context.Background(), redis.TotalSlotRewards(slotId.String())) // Total rewards update failed, deleted the outdated value
 			return
@@ -50,12 +51,16 @@ func CalculateAndStoreRewards(day, slotId *big.Int) {
 func UpdateRewards(day *big.Int) {
 	slots := txManager.BatchUpdateRewards(day)
 	txManager.EnsureRewardUpdateSuccess(day)
-	if count, err := redis.Get(context.Background(), redis.TransactionReceiptCountByEvent(day.String())); err != nil && count != "" {
+	if count, err := redis.Get(context.Background(), redis.TransactionReceiptCountByEvent(day.String())); count != "" {
 		log.Debugf("Transaction receipt fetches for day %s: %s", day.String(), count)
 		n, _ := strconv.Atoi(count)
 		if n > (len(slots)/config.SettingsObj.BatchSize)*3 { // giving upto 3 retries per txn
 			clients.SendFailureNotification("EnsureRewardUpdateSuccess", fmt.Sprintf("Too many transaction receipts fetched for day %s: %s", day.String(), count), time.Now().String(), "Medium")
+			log.Debugf("Too many transaction receipts fetched for day %s: %s", day.String(), count)
 		}
+	} else if err != nil {
+		clients.SendFailureNotification("UpdateRewards transaction receipt fetch", fmt.Sprintf("Redis fetch error for day %s: %s", day.String(), err.Error()), time.Now().String(), "Medium")
+		log.Debugf("UpdateRewards transaction receipt fetch error for day %s: %s", day.String(), err.Error())
 	}
 	redis.Delete(context.Background(), redis.TransactionReceiptCountByEvent(day.String()))
 
@@ -116,6 +121,7 @@ func UpdateSubmissionCounts(batchSubmissions []*ipfs.BatchSubmission, day *big.I
 			}
 			err = redis.AddToSet(context.Background(), redis.SlotSubmissionSetByDay(day.String()), redis.SlotSubmissionKey(slotId.String(), day.String()))
 			if err != nil {
+				clients.SendFailureNotification("UpdateSubmissionCounts", err.Error(), time.Now().String(), "High")
 				log.Errorln("Error updating slot submission in redis: ", err)
 			}
 

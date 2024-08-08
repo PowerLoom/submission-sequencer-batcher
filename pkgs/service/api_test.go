@@ -38,6 +38,7 @@ func TestMain(m *testing.M) {
 		AuthReadToken:   "valid-token",
 		RedisHost:       mr.Host(),
 		RedisPort:       mr.Port(),
+		RedisDB:         "0",
 	}
 
 	redis.RedisClient = redis.NewRedisClient()
@@ -169,7 +170,7 @@ func setupRedisForDailyRewardsTest(t *testing.T, slotID int, day int, dailySubmi
 
 	// Mock daily snapshot quota and reward base points
 	dailySnapshotQuota = big.NewInt(10)
-	rewardBasePoints = big.NewInt(1000)
+	rewardBasePoints = new(big.Int).Mul(big.NewInt(1000), big.NewInt(baseExponent))
 
 	// Populate Redis with test data
 	key := redis.SlotSubmissionKey(strconv.Itoa(slotID), strconv.Itoa(day))

@@ -68,8 +68,12 @@ func processEpoch(epochId, submissionLimit *big.Int, begin *types.Block) {
 		"header_count":  len(headers),
 		"timestamp":     time.Now().Unix(),
 	}
+
 	// Set timestamp and block number for triggered collection flow
-	redis.SetProcessLog(context.Background(), redis.TriggeredProcessLog(pkgs.TriggerCollectionFlow, epochId.String()), logEntry, 4*time.Hour)
+	if err := redis.SetProcessLog(context.Background(), redis.TriggeredProcessLog(pkgs.TriggerCollectionFlow, epochId.String()), logEntry, 4*time.Hour); err != nil {
+		clients.SendFailureNotification("TriggerCollectionFlow", err.Error(), time.Now().String(), "High")
+		log.Errorln("TriggerCollectionFlow process log error: ", err.Error())
+	}
 
 	updatedDay := new(big.Int).SetUint64(((epochId.Uint64() - 1) / EpochsPerDay) + 1 + pkgs.DayBuffer)
 	if updatedDay.Cmp(Day) > 0 {
@@ -100,12 +104,15 @@ func triggerCollectionFlow(epochID *big.Int, headers []string, day *big.Int) {
 		time.Sleep(time.Second * time.Duration(config.SettingsObj.BlockTime*len(batchSubmissions)))
 		log.Debugln("Verifying all batch submissions")
 		txManager.EnsureBatchSubmissionSuccess(epochID)
-		if count, err := redis.Get(context.Background(), redis.TransactionReceiptCountByEvent(epochID.String())); err != nil && count != "" {
+		if count, err := redis.Get(context.Background(), redis.TransactionReceiptCountByEvent(epochID.String())); count != "" {
 			log.Debugf("Transaction receipt fetches for epoch %s: %s", epochID.String(), count)
 			n, _ := strconv.Atoi(count)
 			if n > len(batchSubmissions)*3 { // giving upto 3 retries per txn
 				clients.SendFailureNotification("EnsureBatchSubmissionSuccess", fmt.Sprintf("Too many transaction receipts fetched for epoch %s: %s", epochID.String(), count), time.Now().String(), "Medium")
 			}
+		} else if err != nil {
+			clients.SendFailureNotification("Redis error", err.Error(), time.Now().String(), "High")
+			log.Errorln("Redis error: ", err.Error())
 		}
 		redis.Delete(context.Background(), redis.TransactionReceiptCountByEvent(epochID.String()))
 		UpdateSubmissionCounts(batchSubmissions, day)

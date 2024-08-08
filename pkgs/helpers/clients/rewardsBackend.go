@@ -3,11 +3,14 @@ package clients
 import (
 	"bytes"
 	"collector/config"
+	"collector/pkgs"
+	"collector/pkgs/helpers/redis"
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	log "github.com/sirupsen/logrus"
 	"net/http"
+	"strconv"
 	"time"
 )
 
@@ -38,7 +41,7 @@ func (rh *RewardsBackend) Do(req *http.Request) (*http.Response, error) {
 
 func AssignSlotReward(slotId, day int) {
 	payload := UpdateSlotRewardMessage{
-		Token:      config.SettingsObj.AuthReadToken,
+		Token:      config.SettingsObj.AuthWriteToken,
 		SlotID:     slotId,
 		DayCounter: day,
 	}
@@ -46,11 +49,11 @@ func AssignSlotReward(slotId, day int) {
 	jsonData, err := json.Marshal(payload)
 	if err != nil {
 		SendFailureNotification("AssignSlotReward", fmt.Sprintf("Error marshalling json: %s", err.Error()), time.Now().String(), "Medium")
-		log.Errorln("Error marshaling JSON:", err)
+		log.Errorln("Error marshalling JSON:", err)
 		return
 	}
 
-	req, err := http.NewRequest("POST", config.SettingsObj.RewardsBackendUrl, bytes.NewBuffer(jsonData))
+	req, err := http.NewRequest("POST", rewardsBackendClient.url+"/assignSlotReward", bytes.NewBuffer(jsonData))
 	if err != nil {
 		SendFailureNotification("AssignSlotReward", fmt.Sprintf("Error creating request: %s", err.Error()), time.Now().String(), "Medium")
 		log.Errorln("Error creating request:", err)
@@ -58,11 +61,18 @@ func AssignSlotReward(slotId, day int) {
 	}
 
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("accept", "application/json") // Ensure this matches your curl headers
 
 	resp, err := rewardsBackendClient.Do(req)
 	if err != nil {
 		SendFailureNotification("AssignSlotReward", fmt.Sprintf("Error sending request: %s", err.Error()), time.Now().String(), "Medium")
-		log.Errorln("Error sending request:", err)
+		log.Errorln("Error sending request:", err.Error())
+
+		// TODO: Check if this should be deleted manually as per need or after a set period of time
+		if err = redis.UpdateHashTable(pkgs.RewardsBackendFailures, strconv.Itoa(day), strconv.Itoa(slotId)); err != nil {
+			SendFailureNotification("AssignSlotReward", fmt.Sprintf("Error updating failed request for slot %d: %s", slotId, err.Error()), time.Now().String(), "Medium")
+			log.Errorf("Error updating failed request for slot %d: %s", slotId, err.Error())
+		}
 		return
 	}
 	defer resp.Body.Close()

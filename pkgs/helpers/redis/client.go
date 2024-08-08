@@ -2,7 +2,6 @@ package redis
 
 import (
 	"collector/config"
-	"collector/pkgs/helpers/clients"
 	"context"
 	"encoding/json"
 	"errors"
@@ -11,6 +10,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"math/big"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -36,8 +36,7 @@ func NewRedisClient() *redis.Client {
 
 func AddToSet(ctx context.Context, set string, keys ...string) error {
 	if err := RedisClient.SAdd(ctx, set, keys).Err(); err != nil {
-		clients.SendFailureNotification("Redis error", err.Error(), time.Now().String(), "High")
-		return err
+		return errors.New(fmt.Sprintf("Unable to add to set: %s", err.Error()))
 	}
 	return nil
 }
@@ -56,11 +55,9 @@ func Delete(ctx context.Context, set string) error {
 
 func SetSubmission(ctx context.Context, key string, value string, set string, expiration time.Duration) error {
 	if err := RedisClient.SAdd(ctx, set, key).Err(); err != nil {
-		clients.SendFailureNotification("Redis error", err.Error(), time.Now().String(), "High")
 		return err
 	}
 	if err := RedisClient.Set(ctx, key, value, expiration).Err(); err != nil {
-		clients.SendFailureNotification("Redis error", err.Error(), time.Now().String(), "High")
 		return err
 	}
 	return nil
@@ -72,7 +69,6 @@ func Get(ctx context.Context, key string) (string, error) {
 		if errors.Is(err, redis.Nil) {
 			return "", nil
 		} else {
-			clients.SendFailureNotification("Redis error", err.Error(), time.Now().String(), "High")
 			return "", err
 		}
 	}
@@ -87,16 +83,33 @@ func Set(ctx context.Context, key, value string, expiration time.Duration) error
 func SetProcessLog(ctx context.Context, key string, logEntry map[string]interface{}, exp time.Duration) error {
 	data, err := json.Marshal(logEntry)
 	if err != nil {
-		clients.SendFailureNotification("Redis SetProcessLog marshalling", err.Error(), time.Now().String(), "High")
 		return fmt.Errorf("failed to marshal log entry: %w", err)
 	}
 
 	err = RedisClient.Set(ctx, key, data, exp).Err()
 	if err != nil {
-		clients.SendFailureNotification("Redis error", err.Error(), time.Now().String(), "High")
 		return fmt.Errorf("failed to set log entry in Redis: %w", err)
 	}
 
+	return nil
+}
+
+func UpdateHashTable(table, key, value string) error {
+	existingVals := RedisClient.HGet(context.Background(), table, key).Val()
+
+	// Split existing slots into a slice, or start with an empty slice
+	vals := []string{}
+	if existingVals != "" {
+		vals = strings.Split(existingVals, ",")
+	}
+
+	// Append the new slot ID
+	vals = append(vals, value)
+
+	// Update the hash with the new list of slots
+	if err := RedisClient.HSet(context.Background(), table, key, strings.Join(vals, ",")).Err(); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -121,7 +134,6 @@ func ResetCollectorDBSubmissions(ctx context.Context, epochID *big.Int, headers 
 		keysToDelete, err := RedisClient.SMembers(ctx, setKey).Result()
 		if err != nil {
 			log.Errorf("Error retrieving keys from set: %v", err)
-			clients.SendFailureNotification("Redis error", err.Error(), time.Now().String(), "High")
 			return
 		}
 
@@ -129,7 +141,6 @@ func ResetCollectorDBSubmissions(ctx context.Context, epochID *big.Int, headers 
 		if len(keysToDelete) > 0 {
 			_, err := RedisClient.Del(ctx, keysToDelete...).Result()
 			if err != nil {
-				clients.SendFailureNotification("Redis error", err.Error(), time.Now().String(), "High")
 				log.Errorf("Error deleting keys: %v", err)
 			} else {
 				log.Debugf("Deleted %d keys.\n", len(keysToDelete))
@@ -138,7 +149,7 @@ func ResetCollectorDBSubmissions(ctx context.Context, epochID *big.Int, headers 
 			// Optionally, delete the set itself to clean up
 			RedisClient.Del(ctx, setKey)
 		} else {
-			//log.Debugln("No keys found to delete.")
+			log.Debugln("No keys found to delete.")
 		}
 	}
 }
