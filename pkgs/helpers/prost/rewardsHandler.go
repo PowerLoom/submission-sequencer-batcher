@@ -50,6 +50,9 @@ func CalculateAndStoreRewards(day, slotId *big.Int) {
 
 func UpdateRewards(day *big.Int) {
 	slots := txManager.BatchUpdateRewards(day)
+
+	time.Sleep(time.Duration(len(slots)/config.SettingsObj.BatchSize) * time.Second)
+
 	txManager.EnsureRewardUpdateSuccess(day)
 	if count, err := redis.Get(context.Background(), redis.TransactionReceiptCountByEvent(day.String())); count != "" {
 		log.Debugf("Transaction receipt fetches for day %s: %s", day.String(), count)
@@ -81,6 +84,7 @@ func UpdateRewards(day *big.Int) {
 				return
 			}
 			clients.AssignSlotReward(slotId, int(day.Int64()))
+			time.Sleep(time.Second)
 		}(slot)
 	}
 
