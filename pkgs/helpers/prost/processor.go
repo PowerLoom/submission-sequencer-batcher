@@ -8,8 +8,10 @@ import (
 	"collector/pkgs/helpers/redis"
 	"context"
 	"fmt"
+	"github.com/cenkalti/backoff/v4"
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/rpc"
 	log "github.com/sirupsen/logrus"
 	"math/big"
 	"strconv"
@@ -17,12 +19,19 @@ import (
 )
 
 func ProcessEvents(block *types.Block, contractABI abi.ABI) {
-	for _, tx := range block.Transactions() {
-		receipt, err := Client.TransactionReceipt(context.Background(), tx.Hash())
-		if err != nil {
-			//log.Errorln(err.Error())
-			continue
-		}
+	var receipts []*types.Receipt
+	var err error
+	operation := func() error {
+		receipts, err = Client.BlockReceipts(context.Background(), rpc.BlockNumberOrHashWithNumber(rpc.BlockNumber(block.Number().Int64())))
+		return err
+	}
+
+	if err = backoff.Retry(operation, backoff.WithMaxRetries(backoff.NewConstantBackOff(100*time.Millisecond), 3)); err != nil {
+		log.Errorln("Error fetching block receipts: ", err.Error())
+		clients.SendFailureNotification("ProcessEvents", fmt.Sprintf("Error fetching block receipts: %s", err.Error()), time.Now().String(), "High")
+		return
+	}
+	for _, receipt := range receipts {
 		for _, vLog := range receipt.Logs {
 			if vLog.Address.Hex() != config.SettingsObj.ContractAddress {
 				continue
@@ -32,7 +41,7 @@ func ProcessEvents(block *types.Block, contractABI abi.ABI) {
 				event, err := Instance.ParseEpochReleased(*vLog)
 				if err != nil {
 					clients.SendFailureNotification("EpochRelease parse error", err.Error(), time.Now().String(), "High")
-					log.Debugln("Error unpacking epochReleased event:", err)
+					log.Errorln("Error unpacking epochReleased event:", err)
 					continue
 				}
 				if event.DataMarketAddress.Hex() == config.SettingsObj.DataMarketAddress {
@@ -41,7 +50,10 @@ func ProcessEvents(block *types.Block, contractABI abi.ABI) {
 						CurrentEpochID = event.EpochId
 						submissionLimit := UpdateSubmissionLimit(new(big.Int).Set(block.Number()))
 						go processEpoch(event.EpochId, submissionLimit, block)
-						redis.Set(context.Background(), pkgs.CurrentEpoch, CurrentEpochID.String(), 0)
+						if err = redis.Set(context.Background(), pkgs.CurrentEpoch, CurrentEpochID.String(), 0); err != nil {
+							clients.SendFailureNotification("ProcessEvents", fmt.Sprintf("Unable to update current epoch in redis: %s", err.Error()), time.Now().String(), "High")
+							log.Errorln("Unable to update current epoch in redis:", err.Error())
+						}
 					}
 				}
 			}
@@ -80,7 +92,11 @@ func processEpoch(epochId, submissionLimit *big.Int, begin *types.Block) {
 		prev := new(big.Int).Set(Day)
 		Day = new(big.Int).Set(updatedDay)
 
-		redis.Set(context.Background(), pkgs.SequencerDayKey, Day.String(), 0)
+		err := redis.Set(context.Background(), pkgs.SequencerDayKey, Day.String(), 0)
+		if err != nil {
+			clients.SendFailureNotification("processEpoch", fmt.Sprintf("Unable to update day %s in redis: %s", Day.String(), err.Error()), time.Now().String(), "Medium")
+			log.Errorf("Unable to update day %s in redis: %s", Day.String(), err.Error())
+		}
 		triggerCollectionFlow(epochId, headers, prev)
 		UpdateRewards(prev)
 	} else {
@@ -109,6 +125,7 @@ func triggerCollectionFlow(epochID *big.Int, headers []string, day *big.Int) {
 			n, _ := strconv.Atoi(count)
 			if n > len(batchSubmissions)*3 { // giving upto 3 retries per txn
 				clients.SendFailureNotification("EnsureBatchSubmissionSuccess", fmt.Sprintf("Too many transaction receipts fetched for epoch %s: %s", epochID.String(), count), time.Now().String(), "Medium")
+				log.Errorf("Too many transaction receipts fetched for epoch %s: %s", epochID.String(), count)
 			}
 		} else if err != nil {
 			clients.SendFailureNotification("Redis error", err.Error(), time.Now().String(), "High")
