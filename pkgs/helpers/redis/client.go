@@ -11,10 +11,12 @@ import (
 	"math/big"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
 var RedisClient *redis.Client
+var mutex sync.Mutex
 
 // TODO: Pool size failures to be checked
 func NewRedisClient() *redis.Client {
@@ -94,7 +96,10 @@ func SetProcessLog(ctx context.Context, key string, logEntry map[string]interfac
 	return nil
 }
 
-func UpdateHashTable(table, key, value string) error {
+// Used across multiple routines - prevents race conditions
+func LockUpdateHashTable(table, key, value string) error {
+	mutex.Lock()
+	defer mutex.Unlock()
 	existingVals := RedisClient.HGet(context.Background(), table, key).Val()
 
 	// Split existing slots into a slice, or start with an empty slice

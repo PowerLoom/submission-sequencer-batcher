@@ -13,7 +13,6 @@ import (
 	"google.golang.org/protobuf/encoding/protojson"
 	"math/big"
 	"strconv"
-	"sync"
 	"time"
 )
 
@@ -64,27 +63,7 @@ func UpdateRewards(day *big.Int) {
 	}
 	redis.Delete(context.Background(), redis.TransactionReceiptCountByEvent(day.String()))
 
-	var wg sync.WaitGroup
-	maxConcurrency := 10
-	semaphore := make(chan struct{}, maxConcurrency)
-
-	for _, slot := range slots {
-		wg.Add(1)
-		semaphore <- struct{}{}
-		go func(slot string) {
-			defer wg.Done()
-			defer func() { <-semaphore }()
-
-			slotId, err := strconv.Atoi(slot)
-			if err != nil {
-				log.Errorln("Invalid slot ID: ", slot)
-				return
-			}
-			clients.AssignSlotReward(slotId, int(day.Int64()))
-		}(slot)
-	}
-
-	wg.Wait() // Wait for all goroutines to finish
+	clients.BulkAssignSlotRewards(int(day.Int64()), slots)
 }
 
 func UpdateSubmissionCounts(batchSubmissions []*ipfs.BatchSubmission, day *big.Int) {

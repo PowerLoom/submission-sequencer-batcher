@@ -105,17 +105,14 @@ func processEpoch(epochId, submissionLimit *big.Int, begin *types.Block) {
 }
 
 func triggerCollectionFlow(epochID *big.Int, headers []string, day *big.Int) {
-	LockDB = true
 
 	if batchSubmissions, err := merkle.BuildBatchSubmissions(epochID, headers); err != nil {
 		log.Debugln("Error building batched merkle tree: ", err)
-		LockDB = false
 	} else {
 		txManager.CommitSubmissionBatches(batchSubmissions)
 		//log.Debugf("Merkle tree built, resetting db for epoch: %d", epochID)
 		// remove submissions as we no longer need them
 		redis.ResetCollectorDBSubmissions(context.Background(), epochID, headers)
-		LockDB = false
 		// ensure all transactions were included after waiting for new block
 		time.Sleep(time.Second * time.Duration(config.SettingsObj.BlockTime*len(batchSubmissions)))
 		log.Debugln("Verifying all batch submissions")
