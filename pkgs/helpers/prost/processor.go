@@ -114,7 +114,6 @@ func triggerCollectionFlow(epochID *big.Int, headers []string, day *big.Int) {
 		// remove submissions as we no longer need them
 		redis.ResetCollectorDBSubmissions(context.Background(), epochID, headers)
 		// ensure all transactions were included after waiting for new block
-		time.Sleep(time.Second * time.Duration(config.SettingsObj.BlockTime*len(batchSubmissions)))
 		log.Debugln("Verifying all batch submissions")
 		txManager.EnsureBatchSubmissionSuccess(epochID)
 		if count, err := redis.Get(context.Background(), redis.TransactionReceiptCountByEvent(epochID.String())); count != "" {
