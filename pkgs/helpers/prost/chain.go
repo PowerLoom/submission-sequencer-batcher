@@ -23,7 +23,6 @@ var (
 	Client         *ethclient.Client
 	CurrentBlock   *types.Block
 	CurrentEpochID = new(big.Int)
-	LockDB         = false
 )
 
 // TODO: Check ethclient options, connection issues

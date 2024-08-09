@@ -13,7 +13,6 @@ import (
 	"google.golang.org/protobuf/encoding/protojson"
 	"math/big"
 	"strconv"
-	"sync"
 	"time"
 )
 
@@ -50,9 +49,6 @@ func CalculateAndStoreRewards(day, slotId *big.Int) {
 
 func UpdateRewards(day *big.Int) {
 	slots := txManager.BatchUpdateRewards(day)
-
-	time.Sleep(time.Duration(len(slots)/config.SettingsObj.BatchSize) * time.Second)
-
 	txManager.EnsureRewardUpdateSuccess(day)
 	if count, err := redis.Get(context.Background(), redis.TransactionReceiptCountByEvent(day.String())); count != "" {
 		log.Debugf("Transaction receipt fetches for day %s: %s", day.String(), count)
@@ -67,28 +63,7 @@ func UpdateRewards(day *big.Int) {
 	}
 	redis.Delete(context.Background(), redis.TransactionReceiptCountByEvent(day.String()))
 
-	var wg sync.WaitGroup
-	maxConcurrency := 10
-	semaphore := make(chan struct{}, maxConcurrency)
-
-	for _, slot := range slots {
-		wg.Add(1)
-		semaphore <- struct{}{}
-		go func(slot string) {
-			defer wg.Done()
-			defer func() { <-semaphore }()
-
-			slotId, err := strconv.Atoi(slot)
-			if err != nil {
-				log.Errorln("Invalid slot ID: ", slot)
-				return
-			}
-			clients.AssignSlotReward(slotId, int(day.Int64()))
-			time.Sleep(time.Second)
-		}(slot)
-	}
-
-	wg.Wait() // Wait for all goroutines to finish
+	clients.BulkAssignSlotRewards(int(day.Int64()), slots)
 }
 
 func UpdateSubmissionCounts(batchSubmissions []*ipfs.BatchSubmission, day *big.Int) {
