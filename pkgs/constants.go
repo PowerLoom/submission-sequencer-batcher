@@ -15,13 +15,14 @@ const (
 
 // General Key Constants
 const (
+	MaxBatchRetries             = 3
+	MaxRewardUpdateRetries      = 5
 	RewardsBackendFailures      = "RewardsBackendFailures"
 	CurrentEpoch                = "CurrentEpochID"
 	TransactionReceiptCount     = "TransactionReceiptCount"
 	SequencerCurrentBlockNumber = "SequencerState.CurrentBlockNumber"
 	CollectorKey                = "SnapshotCollector"
 	TxsKey                      = "SnapshotTransactions"
-	TimeSlotKey                 = "TimeSlotPreference"
 	SlotSubmissionsKey          = "SlotSubmissionsKey"
 	DaySubmissionsKey           = "DaySubmissionsKey"
 	Day                         = 24 * time.Hour
@@ -32,7 +33,6 @@ const (
 	TotalRewardPointsKey        = "TotalRewardPointsKey"
 	TaskCompletionKey           = "TaskCompletionKey"
 	SlotStreakKey               = "SlotStreakKey"
-	DayCounterKey               = "DayCounterKey"
 	EpochSubmissionsCountKey    = "EpochSubmissionsCountKey"
 	EpochSubmissionsKey         = "EpochSubmissionsKey"
 	ProcessTriggerKey           = "TriggeredSequencerProcess"

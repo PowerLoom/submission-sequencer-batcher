@@ -17,6 +17,7 @@ import (
 	httpSwagger "github.com/swaggo/http-swagger"
 	"math/big"
 	"net/http"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -304,6 +305,7 @@ func handleFinalizedBatchSubmissions(w http.ResponseWriter, r *http.Request) {
 
 	keys := redis.RedisClient.Keys(context.Background(), fmt.Sprintf("%s.%s.*", pkgs.ProcessTriggerKey, pkgs.FinalizeBatches)).Val()
 
+	sort.Strings(keys)
 	var logs []LogType
 
 	for _, key := range keys {
@@ -368,6 +370,8 @@ func handleTriggeredCollectionFlows(w http.ResponseWriter, r *http.Request) {
 	}
 
 	keys := redis.RedisClient.Keys(context.Background(), fmt.Sprintf("%s.%s.*", pkgs.ProcessTriggerKey, pkgs.TriggerCollectionFlow)).Val()
+
+	sort.Strings(keys)
 
 	var logs []LogType
 
@@ -435,6 +439,8 @@ func handleBuiltBatches(w http.ResponseWriter, r *http.Request) {
 
 	keys := redis.RedisClient.Keys(context.Background(), fmt.Sprintf("%s.%s.*", pkgs.ProcessTriggerKey, pkgs.BuildBatch)).Val()
 
+	sort.Strings(keys)
+
 	var logs []LogType
 
 	for _, key := range keys {
@@ -500,6 +506,7 @@ func handleCommittedSubmissionBatches(w http.ResponseWriter, r *http.Request) {
 	}
 
 	keys := redis.RedisClient.Keys(context.Background(), fmt.Sprintf("%s.%s.*", pkgs.ProcessTriggerKey, pkgs.CommitSubmissionBatch)).Val()
+	sort.Strings(keys)
 
 	var logs []LogType
 
@@ -630,6 +637,7 @@ func handleIncludedEpochSubmissionsCount(w http.ResponseWriter, r *http.Request)
 	}
 
 	keys := redis.RedisClient.Keys(context.Background(), fmt.Sprintf("%s.%s.*", pkgs.ProcessTriggerKey, pkgs.BuildBatch)).Val()
+	sort.Strings(keys)
 
 	var totalSubmissions int
 
@@ -701,6 +709,7 @@ func handleReceivedEpochSubmissionsCount(w http.ResponseWriter, r *http.Request)
 	}
 
 	keys := redis.RedisClient.Keys(context.Background(), fmt.Sprintf("%s.*", pkgs.EpochSubmissionsCountKey)).Val()
+	sort.Strings(keys)
 
 	var totalSubmissions int
 
@@ -765,6 +774,7 @@ func handleReceivedEpochSubmissions(w http.ResponseWriter, r *http.Request) {
 
 	// Fetch keys for epoch submissions
 	keys := redis.RedisClient.Keys(context.Background(), fmt.Sprintf("%s.*", pkgs.EpochSubmissionsKey)).Val()
+	sort.Strings(keys)
 
 	var logs []LogType
 
@@ -1024,6 +1034,7 @@ func handleRewardUpdates(w http.ResponseWriter, r *http.Request) {
 
 	// Fetch keys for reward updates logs
 	keys := redis.RedisClient.Keys(context.Background(), fmt.Sprintf("%s.%s.*", pkgs.ProcessTriggerKey, pkgs.UpdateRewards)).Val()
+	sort.Strings(keys)
 
 	var logs []LogType
 

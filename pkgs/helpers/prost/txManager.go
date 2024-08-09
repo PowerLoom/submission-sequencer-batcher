@@ -18,6 +18,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -34,7 +35,7 @@ func InitializeTxManager() {
 }
 
 func (tm *TxManager) EndBatchSubmissionsForEpoch(epochId *big.Int) {
-	account := tm.accountHandler.GetFreeAccount()
+	account := tm.accountHandler.GetFreeAccount(true)
 	defer tm.accountHandler.ReleaseAccount(account)
 	multiplier := 1
 	var err error
@@ -70,13 +71,63 @@ func (tm *TxManager) GetTxReceipt(txHash common.Hash, identifier string) (*types
 }
 
 func (tm *TxManager) CommitSubmissionBatches(batchSubmissions []*ipfs.BatchSubmission) {
-	account := tm.accountHandler.GetFreeAccount()
-	defer tm.accountHandler.ReleaseAccount(account)
+	var wg sync.WaitGroup
+	accounts := []*Account{}
+	var requiredAccounts int
 
-	for _, batchSubmission := range batchSubmissions {
-		tm.CommitSubmissionBatch(account, batchSubmission)
-		account.UpdateAuth(1)
+	batchDivision := len(batchSubmissions) / config.SettingsObj.PermissibleBatchesPerAccount
+	if extra := len(batchSubmissions) % config.SettingsObj.PermissibleBatchesPerAccount; extra == 0 {
+		requiredAccounts = batchDivision
+	} else {
+		requiredAccounts = batchDivision + 1
 	}
+
+	// try to get required free accounts
+	for i := 0; i < requiredAccounts; i++ {
+		if account := tm.accountHandler.GetFreeAccount(false); account != nil {
+			accounts = append(accounts, account)
+		}
+	}
+
+	if len(accounts) == 0 {
+		log.Warnln("All accounts are occupied, waiting for one account and proceeding with batch submissions")
+		accounts = append(accounts, tm.accountHandler.GetFreeAccount(true))
+	}
+
+	// divide evenly among available accounts
+	batchesPerAccount := len(batchSubmissions) / len(accounts)
+	var begin, end int
+	// send asynchronous batch submissions
+	for i := 0; i < len(accounts); i++ {
+		account := accounts[i]
+
+		begin = i * batchesPerAccount
+		if i == len(accounts)-1 {
+			end = len(batchSubmissions)
+		} else {
+			end = (i + 1) * batchesPerAccount
+		}
+		batch := batchSubmissions[begin:end]
+
+		wg.Add(1)
+
+		// Process the batch asynchronously
+		go func(acc *Account, submissions []*ipfs.BatchSubmission) {
+			defer wg.Done()
+
+			// Commit each submission batch in the current batch
+			for _, batchSubmission := range submissions {
+				tm.CommitSubmissionBatch(acc, batchSubmission)
+				acc.UpdateAuth(1)
+			}
+
+			// Release the account after processing the batch
+			tm.accountHandler.ReleaseAccount(acc)
+		}(account, batch)
+	}
+
+	// Wait for all goroutines to complete
+	wg.Wait()
 }
 
 func (tm *TxManager) CommitSubmissionBatch(account *Account, batchSubmission *ipfs.BatchSubmission) {
@@ -132,7 +183,7 @@ func (tm *TxManager) BatchUpdateRewards(day *big.Int) []string {
 	batchSize := config.SettingsObj.BatchSize
 	submittedSlots := []string{}
 
-	account := tm.accountHandler.GetFreeAccount()
+	account := tm.accountHandler.GetFreeAccount(true)
 	defer tm.accountHandler.ReleaseAccount(account)
 
 	slotSubmissionCounts := redis.GetSetKeys(context.Background(), redis.SlotSubmissionSetByDay(day.String()))
@@ -187,6 +238,7 @@ func (tm *TxManager) BatchUpdateRewards(day *big.Int) []string {
 	return submittedSlots
 }
 
+// TODO: Use multiple accounts
 func (tm *TxManager) UpdateRewards(account *Account, slotIds, submissions []*big.Int, day *big.Int) {
 	multiplier := 1
 	var tx *types.Transaction
@@ -255,11 +307,20 @@ func (tm *TxManager) UpdateRewards(account *Account, slotIds, submissions []*big
 }
 
 func (tm *TxManager) EnsureRewardUpdateSuccess(day *big.Int) {
-	account := tm.accountHandler.GetFreeAccount()
+	account := tm.accountHandler.GetFreeAccount(true)
 	defer tm.accountHandler.ReleaseAccount(account)
+	resubmissionIterations := 0
+
 	for {
+		resubmissionIterations += 1
 		hashes := redis.GetSetKeys(context.Background(), redis.RewardUpdateSetByDay(day.String()))
 		if len(hashes) == 0 {
+			return
+		}
+		if resubmissionIterations > pkgs.MaxRewardUpdateRetries {
+			// Not removing these keys to keep reward state
+			clients.SendFailureNotification("EnsureRewardUpdateSuccess", fmt.Sprintf("Reached max retry iterations for day: %s", day.String()), time.Now().String(), "High")
+			log.Errorf("Reached max retry iterations for day: %s", day.String())
 			return
 		}
 		for _, hash := range hashes {
@@ -322,17 +383,33 @@ func (tm *TxManager) EnsureRewardUpdateSuccess(day *big.Int) {
 	}
 }
 
-// todo: notify failed tx
-// TODO: An endpoint is required for getting past batch submissions for 1 hour, do not delete all transactions
 func (tm *TxManager) EnsureBatchSubmissionSuccess(epochID *big.Int) {
-	account := tm.accountHandler.GetFreeAccount()
+	account := tm.accountHandler.GetFreeAccount(true)
 	defer tm.accountHandler.ReleaseAccount(account)
 
 	txSet := redis.BatchSubmissionSetByEpoch(epochID.String())
+	resubmissionIterations := 0
 	for {
+		resubmissionIterations += 1
 		keys := redis.RedisClient.SMembers(context.Background(), txSet).Val()
 		if len(keys) == 0 {
 			log.Debugln("No transactions remaining for epochID: ", epochID.String())
+			if _, err := redis.RedisClient.Del(context.Background(), txSet).Result(); err != nil {
+				log.Errorf("Unable to delete transaction from redis: %s\n", err.Error())
+			}
+			return
+		}
+		if resubmissionIterations > pkgs.MaxBatchRetries {
+			clients.SendFailureNotification("EnsureBatchSubmissionSuccess", fmt.Sprintf("Reached max retry iterations for epoch: %s", epochID.String()), time.Now().String(), "High")
+			log.Errorf("Reached max retry iterations for epoch: %s", epochID.String())
+			for _, key := range keys {
+				if _, err := redis.RedisClient.Del(context.Background(), key).Result(); err != nil {
+					log.Errorf("Unable to delete transaction from redis: %s\n", err.Error())
+				}
+				if err := redis.RemoveFromSet(context.Background(), txSet, key); err != nil {
+					log.Errorf("Unable to delete transaction from transaction set: %s\n", err.Error())
+				}
+			}
 			if _, err := redis.RedisClient.Del(context.Background(), txSet).Result(); err != nil {
 				log.Errorf("Unable to delete transaction from redis: %s\n", err.Error())
 			}
@@ -343,6 +420,13 @@ func (tm *TxManager) EnsureBatchSubmissionSuccess(epochID *big.Int) {
 			if value, err := redis.Get(context.Background(), key); err != nil {
 				clients.SendFailureNotification("EnsureBatchSubmissionSuccess", fmt.Sprintf("Unable to fetch value for key: %s\n", key), time.Now().String(), "High")
 				log.Errorf("Unable to fetch value for key: %s\n", key)
+				if _, err := redis.RedisClient.Del(context.Background(), key).Result(); err != nil {
+					log.Errorf("Unable to delete transaction from redis: %s\n", err.Error())
+				}
+				if err = redis.RemoveFromSet(context.Background(), txSet, key); err != nil {
+					log.Errorf("Unable to delete transaction from transaction set: %s\n", err.Error())
+				}
+				continue
 			} else {
 				vals := strings.Split(value, ".")
 				if len(vals) < 2 {
@@ -351,7 +435,7 @@ func (tm *TxManager) EnsureBatchSubmissionSuccess(epochID *big.Int) {
 					if _, err := redis.RedisClient.Del(context.Background(), key).Result(); err != nil {
 						log.Errorf("Unable to delete transaction from redis: %s\n", err.Error())
 					}
-					if _, err := redis.RedisClient.SRem(context.Background(), txSet, key).Result(); err != nil {
+					if err = redis.RemoveFromSet(context.Background(), txSet, key); err != nil {
 						log.Errorf("Unable to delete transaction from transaction set: %s\n", err.Error())
 					}
 					continue
@@ -365,7 +449,7 @@ func (tm *TxManager) EnsureBatchSubmissionSuccess(epochID *big.Int) {
 					if _, err := redis.RedisClient.Del(context.Background(), key).Result(); err != nil {
 						log.Errorf("Unable to delete transaction from redis: %s\n", err.Error())
 					}
-					if _, err := redis.RedisClient.SRem(context.Background(), txSet, key).Result(); err != nil {
+					if err = redis.RemoveFromSet(context.Background(), txSet, key); err != nil {
 						log.Errorf("Unable to delete transaction from transaction set: %s\n", err.Error())
 					}
 					continue
@@ -444,7 +528,7 @@ func (tm *TxManager) EnsureBatchSubmissionSuccess(epochID *big.Int) {
 				if _, err := redis.RedisClient.Del(context.Background(), key).Result(); err != nil {
 					log.Errorf("Unable to delete transaction from redis: %s\n", err.Error())
 				}
-				if _, err := redis.RedisClient.SRem(context.Background(), txSet, key).Result(); err != nil {
+				if err = redis.RemoveFromSet(context.Background(), txSet, key); err != nil {
 					log.Errorf("Unable to delete transaction from transaction set: %s\n", err.Error())
 				}
 			}

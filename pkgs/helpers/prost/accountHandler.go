@@ -109,7 +109,7 @@ func (account *Account) UpdateAuth(num uint64) {
 	account.auth.Nonce = new(big.Int).Add(account.auth.Nonce, new(big.Int).SetUint64(num))
 }
 
-func (ah *AccountHandler) GetFreeAccount() *Account {
+func (ah *AccountHandler) GetFreeAccount(canWait bool) *Account {
 	ah.mu.Lock()
 	defer ah.mu.Unlock()
 	for {
@@ -124,6 +124,9 @@ func (ah *AccountHandler) GetFreeAccount() *Account {
 			}
 		}
 		log.Debugln("All accounts are occupied - waiting")
+		if !canWait {
+			return nil
+		}
 		ProcessesOnHold += 1
 		if ProcessesOnHold > 2 {
 			log.Errorf("%d Processes on hold: all accounts are occupied", ProcessesOnHold)
