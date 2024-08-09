@@ -78,7 +78,7 @@ func (tm *TxManager) CommitSubmissionBatches(batchSubmissions []*ipfs.BatchSubmi
 	batchDivision := len(batchSubmissions) / config.SettingsObj.PermissibleBatchesPerAccount
 	if extra := len(batchSubmissions) % config.SettingsObj.PermissibleBatchesPerAccount; extra == 0 {
 		requiredAccounts = batchDivision
-	} else if extra >= 10 {
+	} else {
 		requiredAccounts = batchDivision + 1
 	}
 
@@ -238,6 +238,7 @@ func (tm *TxManager) BatchUpdateRewards(day *big.Int) []string {
 	return submittedSlots
 }
 
+// TODO: Use multiple accounts
 func (tm *TxManager) UpdateRewards(account *Account, slotIds, submissions []*big.Int, day *big.Int) {
 	multiplier := 1
 	var tx *types.Transaction

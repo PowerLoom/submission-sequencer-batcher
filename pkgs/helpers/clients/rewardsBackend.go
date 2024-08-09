@@ -2,6 +2,7 @@ package clients
 
 import (
 	"bytes"
+	"collector/config"
 	"collector/pkgs"
 	"collector/pkgs/helpers/redis"
 	"context"
@@ -63,7 +64,7 @@ func BulkAssignSlotRewards(day int, slots []string) {
 
 			slotId, err := strconv.Atoi(slot)
 			if err != nil {
-				log.Errorln("Invalid slot ID: ", slot)
+				log.Errorf("Invalid slot ID %s: %s", slot, err.Error())
 				return
 			}
 			if err = AssignSlotReward(slotId, day); err != nil {
@@ -79,7 +80,7 @@ func BulkAssignSlotRewards(day int, slots []string) {
 
 func AssignSlotReward(slotId, day int) error {
 	payload := UpdateSlotRewardMessage{
-		Token:      "config.SettingsObj.AuthWriteToken",
+		Token:      config.SettingsObj.AuthWriteToken,
 		SlotID:     slotId,
 		DayCounter: day,
 	}
@@ -99,8 +100,8 @@ func AssignSlotReward(slotId, day int) error {
 	}
 
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("accept", "application/json") // Ensure this matches your curl headers
-	resp, err := rewardsBackendClient.Do(nil)
+	req.Header.Set("accept", "application/json")
+	resp, err := rewardsBackendClient.Do(req)
 	if err != nil {
 		SendFailureNotification("AssignSlotReward", fmt.Sprintf("Error sending request: %s", err.Error()), time.Now().String(), "Medium")
 		log.Errorln("Error sending request:", err.Error())
