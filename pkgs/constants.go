@@ -15,6 +15,8 @@ const (
 
 // General Key Constants
 const (
+	MaxBatchRetries             = 3
+	MaxRewardUpdateRetries      = 5
 	RewardsBackendFailures      = "RewardsBackendFailures"
 	CurrentEpoch                = "CurrentEpochID"
 	TransactionReceiptCount     = "TransactionReceiptCount"
