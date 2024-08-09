@@ -373,8 +373,6 @@ func (tm *TxManager) EnsureRewardUpdateSuccess(day *big.Int) {
 	}
 }
 
-// todo: notify failed tx
-// TODO: An endpoint is required for getting past batch submissions for 1 hour, do not delete all transactions
 func (tm *TxManager) EnsureBatchSubmissionSuccess(epochID *big.Int) {
 	account := tm.accountHandler.GetFreeAccount(true)
 	defer tm.accountHandler.ReleaseAccount(account)
@@ -402,7 +400,7 @@ func (tm *TxManager) EnsureBatchSubmissionSuccess(epochID *big.Int) {
 					if _, err := redis.RedisClient.Del(context.Background(), key).Result(); err != nil {
 						log.Errorf("Unable to delete transaction from redis: %s\n", err.Error())
 					}
-					if _, err := redis.RedisClient.SRem(context.Background(), txSet, key).Result(); err != nil {
+					if err = redis.RemoveFromSet(context.Background(), txSet, key); err != nil {
 						log.Errorf("Unable to delete transaction from transaction set: %s\n", err.Error())
 					}
 					continue
@@ -416,7 +414,7 @@ func (tm *TxManager) EnsureBatchSubmissionSuccess(epochID *big.Int) {
 					if _, err := redis.RedisClient.Del(context.Background(), key).Result(); err != nil {
 						log.Errorf("Unable to delete transaction from redis: %s\n", err.Error())
 					}
-					if _, err := redis.RedisClient.SRem(context.Background(), txSet, key).Result(); err != nil {
+					if err = redis.RemoveFromSet(context.Background(), txSet, key); err != nil {
 						log.Errorf("Unable to delete transaction from transaction set: %s\n", err.Error())
 					}
 					continue
@@ -495,7 +493,7 @@ func (tm *TxManager) EnsureBatchSubmissionSuccess(epochID *big.Int) {
 				if _, err := redis.RedisClient.Del(context.Background(), key).Result(); err != nil {
 					log.Errorf("Unable to delete transaction from redis: %s\n", err.Error())
 				}
-				if _, err := redis.RedisClient.SRem(context.Background(), txSet, key).Result(); err != nil {
+				if err = redis.RemoveFromSet(context.Background(), txSet, key); err != nil {
 					log.Errorf("Unable to delete transaction from transaction set: %s\n", err.Error())
 				}
 			}
