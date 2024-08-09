@@ -11,24 +11,25 @@ import (
 var SettingsObj *Settings
 
 type Settings struct {
-	ClientUrl                 string
-	ContractAddress           string
-	RedisHost                 string
-	RedisPort                 string
-	RedisDB                   string
-	IPFSUrl                   string
-	DataMarketAddress         string
-	DataMarketContractAddress common.Address
-	SignerAccountAddresses    []string
-	PrivateKeys               []string
-	AuthReadToken             string
-	AuthWriteToken            string
-	BatchSize                 int
-	ChainID                   int64
-	BlockTime                 int
-	HttpTimeout               int
-	SlackReportingUrl         string
-	RewardsBackendUrl         string
+	ClientUrl                    string
+	ContractAddress              string
+	RedisHost                    string
+	RedisPort                    string
+	RedisDB                      string
+	IPFSUrl                      string
+	DataMarketAddress            string
+	DataMarketContractAddress    common.Address
+	SignerAccountAddresses       []string
+	PrivateKeys                  []string
+	AuthReadToken                string
+	AuthWriteToken               string
+	BatchSize                    int
+	ChainID                      int64
+	BlockTime                    int
+	HttpTimeout                  int
+	SlackReportingUrl            string
+	RewardsBackendUrl            string
+	PermissibleBatchesPerAccount int
 }
 
 func LoadConfig() {
@@ -52,6 +53,7 @@ func LoadConfig() {
 		"SLACK_REPORTING_URL",
 		"REWARDS_BACKEND_URL",
 		"HTTP_TIMEOUT",
+		"PERMISSIBLE_BATCHES_PER_ACCOUNT",
 	}
 
 	for envVar := range requiredEnvVars {
@@ -116,6 +118,12 @@ func LoadConfig() {
 		log.Fatalf("Failed to parse BATCH_SIZE environment variable: %v", batchSizeParseErr)
 	}
 	config.BatchSize = batchSize
+
+	permissibleBatches, permissibleBatchesParseErr := strconv.Atoi(getEnv("PERMISSIBLE_BATCHES_PER_ACCOUNT", ""))
+	if permissibleBatchesParseErr != nil {
+		log.Fatalf("Failed to parse PERMISSIBLE_BATCHES_PER_ACCOUNT environment variable: %v", permissibleBatchesParseErr)
+	}
+	config.PermissibleBatchesPerAccount = permissibleBatches
 
 	blockTime, blockTimeParseErr := strconv.Atoi(getEnv("BLOCK_TIME", ""))
 	if blockTimeParseErr != nil {
