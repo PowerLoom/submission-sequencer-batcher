@@ -76,9 +76,9 @@ func (tm *TxManager) CommitSubmissionBatches(batchSubmissions []*ipfs.BatchSubmi
 	var requiredAccounts int
 
 	batchDivision := len(batchSubmissions) / pkgs.PermissibleBatchesPerAccount
-	if len(batchSubmissions)%pkgs.PermissibleBatchesPerAccount == 0 {
+	if extra := len(batchSubmissions) % pkgs.PermissibleBatchesPerAccount; extra == 0 {
 		requiredAccounts = batchDivision
-	} else {
+	} else if extra >= 10 {
 		requiredAccounts = batchDivision + 1
 	}
 
