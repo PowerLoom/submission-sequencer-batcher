@@ -80,6 +80,7 @@ func finalizeBatches(batchedKeys [][]string, epochId *big.Int, tree *imt.Increme
 	projectValueFrequencies := make(map[string]map[string]int)
 	projectMostFrequent := make(map[string]string)
 	batchSubmissions := make([]*ipfs.BatchSubmission, 0)
+	projectSubmissionsCount := make(map[string]int)
 	//TODO: Don't just return the most frequent, if it is not 51% consensus, trigger a signal for watchers
 
 	// Iterate through each batch
@@ -137,6 +138,9 @@ func finalizeBatches(batchedKeys [][]string, epochId *big.Int, tree *imt.Increme
 			// Track frequency of each value per project
 			projectValueFrequencies[projectId][value] += 1
 
+			// Track total project submissions frequency
+			projectSubmissionsCount[projectId] += 1
+
 			// Determine most frequent value so far
 			if count, exists := projectValueFrequencies[projectId][value]; exists {
 				if count > projectValueFrequencies[projectId][projectMostFrequent[projectId]] {
@@ -158,6 +162,18 @@ func finalizeBatches(batchedKeys [][]string, epochId *big.Int, tree *imt.Increme
 		// Sort the projectIds to ensure the same order is followed by all the sequencers in a decentralized environment
 		sort.Strings(keys)
 		for _, pid := range keys {
+			totalSubmissions := 0
+			for _, count := range projectValueFrequencies[pid] {
+				totalSubmissions += count
+			}
+			if projectValueFrequencies[pid][projectMostFrequent[pid]] > (totalSubmissions / 2) {
+				pids = append(pids, pid)
+				cids = append(cids, projectMostFrequent[pid])
+			} else {
+				log.Errorln("Unable to reach consensus for projectId: ", pid)
+				//TODO: Emit consensus failure signal for watchers
+			}
+
 			pids = append(pids, pid)
 			cids = append(cids, projectMostFrequent[pid])
 		}
