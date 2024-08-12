@@ -923,7 +923,7 @@
         "type": "address[]"
       }
     ],
-    "name": "assignSnapshotterToSlots",
+    "name": "assignSnapshotterToSlotBulk",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"
@@ -1093,19 +1093,14 @@
         "internalType": "uint256",
         "name": "batchId",
         "type": "uint256"
-      },
-      {
-        "internalType": "uint256",
-        "name": "idx",
-        "type": "uint256"
       }
     ],
     "name": "batchIdToProjects",
     "outputs": [
       {
-        "internalType": "string",
+        "internalType": "string[]",
         "name": "",
-        "type": "string"
+        "type": "string[]"
       }
     ],
     "stateMutability": "view",
@@ -1479,19 +1474,14 @@
         "internalType": "uint256",
         "name": "epochId",
         "type": "uint256"
-      },
-      {
-        "internalType": "uint256",
-        "name": "idx",
-        "type": "uint256"
       }
     ],
     "name": "epochIdToBatchIds",
     "outputs": [
       {
-        "internalType": "uint256",
+        "internalType": "uint256[]",
         "name": "",
-        "type": "uint256"
+        "type": "uint256[]"
       }
     ],
     "stateMutability": "view",
@@ -2610,7 +2600,7 @@
       },
       {
         "internalType": "uint256",
-        "name": "dailySnapshotQuota",
+        "name": "_dailySnapshotQuota",
         "type": "uint256"
       }
     ],
