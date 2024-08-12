@@ -607,78 +607,6 @@ func handleBatchResubmissions(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(response)
 }
 
-// @Summary Get included epoch submissions count
-// @Description Retrieves the total number of submissions included in batches for past epochs.
-// @Tags Submissions
-// @Accept json
-// @Produce json
-// @Param request body PastEpochsRequest true "Past Epochs Request"
-// @Success 200 {object} Response[int] "Successful Response"
-// @Failure 400 {string} string "Invalid request or past epochs less than 0"
-// @Failure 401 {string} string "Unauthorized: Incorrect token"
-// @Router /includedEpochSubmissionsCount [post]
-func handleIncludedEpochSubmissionsCount(w http.ResponseWriter, r *http.Request) {
-	var request PastEpochsRequest
-	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-
-	// Authenticate token
-	if request.Token != config.SettingsObj.AuthReadToken {
-		http.Error(w, "Incorrect Token!", http.StatusUnauthorized)
-		return
-	}
-
-	pastEpochs := request.PastEpochs
-	if pastEpochs < 0 {
-		http.Error(w, "Past epochs should be at least 0", http.StatusBadRequest)
-		return
-	}
-
-	keys := redis.RedisClient.Keys(context.Background(), fmt.Sprintf("%s.%s.*", pkgs.ProcessTriggerKey, pkgs.BuildBatch)).Val()
-	sort.Strings(keys)
-
-	var totalSubmissions int
-
-	for _, key := range keys {
-		entry, err := redis.Get(context.Background(), key)
-		if err != nil {
-			continue
-		}
-
-		var logEntry LogType
-		err = json.Unmarshal([]byte(entry), &logEntry)
-		if err != nil {
-			continue
-		}
-
-		if epochIdStr, ok := logEntry["epoch_id"].(string); ok {
-			epochId, err := strconv.Atoi(epochIdStr)
-			if err != nil {
-				continue
-			}
-			if pastEpochs == 0 || epochId >= pastEpochs {
-				if count, ok := logEntry["submissions_count"].(float64); ok {
-					totalSubmissions += int(count)
-				}
-			}
-		}
-	}
-
-	info := InfoType[int]{
-		Success:  true,
-		Response: totalSubmissions,
-	}
-	response := Response[int]{
-		Info:      info,
-		RequestID: r.Context().Value("request_id").(string),
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
-}
-
 // @Summary Get received epoch submissions count
 // @Description Retrieves the total number of submissions received for past epochs.
 // @Tags Submissions
@@ -712,21 +640,92 @@ func handleReceivedEpochSubmissionsCount(w http.ResponseWriter, r *http.Request)
 	sort.Strings(keys)
 
 	var totalSubmissions int
+	var epochs int
+	end := len(keys) - 1
 
-	for _, key := range keys {
+	if request.PastEpochs == 0 {
+		epochs = len(keys)
+	} else {
+		epochs = request.PastEpochs
+	}
+
+	for i := 0; i < epochs; i++ {
+		key := keys[end-i]
 		entry, err := redis.Get(context.Background(), key)
 		if err != nil {
 			continue
 		}
 
-		epochId, err := strconv.Atoi(strings.Split(key, ".")[1])
+		if count, err := strconv.Atoi(entry); err == nil {
+			totalSubmissions += count
+		}
+	}
+
+	info := InfoType[int]{
+		Success:  true,
+		Response: totalSubmissions,
+	}
+	response := Response[int]{
+		Info:      info,
+		RequestID: r.Context().Value("request_id").(string),
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
+}
+
+// @Summary Get included epoch submissions count
+// @Description Retrieves the total number of submissions included in batches for past epochs.
+// @Tags Submissions
+// @Accept json
+// @Produce json
+// @Param request body PastEpochsRequest true "Past Epochs Request"
+// @Success 200 {object} Response[int] "Successful Response"
+// @Failure 400 {string} string "Invalid request or past epochs less than 0"
+// @Failure 401 {string} string "Unauthorized: Incorrect token"
+// @Router /includedEpochSubmissionsCount [post]
+func handleIncludedEpochSubmissionsCount(w http.ResponseWriter, r *http.Request) {
+	var request PastEpochsRequest
+	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	// Authenticate token
+	if request.Token != config.SettingsObj.AuthReadToken {
+		http.Error(w, "Incorrect Token!", http.StatusUnauthorized)
+		return
+	}
+
+	pastEpochs := request.PastEpochs
+	if pastEpochs < 0 {
+		http.Error(w, "Past epochs should be at least 0", http.StatusBadRequest)
+		return
+	}
+
+	keys := redis.RedisClient.Keys(context.Background(), fmt.Sprintf("%s.*", pkgs.BatchIncludedSubmissionsCount)).Val()
+	sort.Strings(keys)
+
+	var totalSubmissions int
+	var epochs int
+
+	end := len(keys) - 1
+
+	if request.PastEpochs == 0 {
+		epochs = len(keys)
+	} else {
+		epochs = request.PastEpochs
+	}
+
+	for i := 0; i < epochs; i++ {
+		key := keys[end-i]
+		entry, err := redis.Get(context.Background(), key)
 		if err != nil {
 			continue
 		}
-		if pastEpochs == 0 || epochId >= pastEpochs {
-			if count, err := strconv.Atoi(entry); err == nil {
-				totalSubmissions += int(count)
-			}
+
+		if count, err := strconv.Atoi(entry); err == nil {
+			totalSubmissions += count
 		}
 	}
 
