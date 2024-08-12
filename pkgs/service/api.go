@@ -5,6 +5,7 @@ import (
 	"collector/pkgs"
 	"collector/pkgs/helpers/prost"
 	"collector/pkgs/helpers/redis"
+	"collector/pkgs/helpers/utils"
 	_ "collector/pkgs/service/docs"
 	"context"
 	"encoding/json"
@@ -17,7 +18,6 @@ import (
 	httpSwagger "github.com/swaggo/http-swagger"
 	"math/big"
 	"net/http"
-	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -304,8 +304,8 @@ func handleFinalizedBatchSubmissions(w http.ResponseWriter, r *http.Request) {
 	}
 
 	keys := redis.RedisClient.Keys(context.Background(), fmt.Sprintf("%s.%s.*", pkgs.ProcessTriggerKey, pkgs.FinalizeBatches)).Val()
+	utils.SortKeysByValue(keys, 2, utils.DESCENDING)
 
-	sort.Strings(keys)
 	var logs []LogType
 
 	for _, key := range keys {
@@ -324,7 +324,7 @@ func handleFinalizedBatchSubmissions(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if pastEpochs > 0 && len(logs) > pastEpochs {
-		logs = logs[len(logs)-pastEpochs:]
+		logs = logs[:pastEpochs]
 	}
 
 	info := InfoType[ResponseArray[LogType]]{
@@ -370,8 +370,7 @@ func handleTriggeredCollectionFlows(w http.ResponseWriter, r *http.Request) {
 	}
 
 	keys := redis.RedisClient.Keys(context.Background(), fmt.Sprintf("%s.%s.*", pkgs.ProcessTriggerKey, pkgs.TriggerCollectionFlow)).Val()
-
-	sort.Strings(keys)
+	utils.SortKeysByValue(keys, 2, utils.DESCENDING)
 
 	var logs []LogType
 
@@ -391,7 +390,7 @@ func handleTriggeredCollectionFlows(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if pastEpochs > 0 && len(logs) > pastEpochs {
-		logs = logs[len(logs)-pastEpochs:]
+		logs = logs[:pastEpochs]
 	}
 
 	info := InfoType[ResponseArray[LogType]]{
@@ -439,7 +438,7 @@ func handleBuiltBatches(w http.ResponseWriter, r *http.Request) {
 
 	keys := redis.RedisClient.Keys(context.Background(), fmt.Sprintf("%s.%s.*", pkgs.ProcessTriggerKey, pkgs.BuildBatch)).Val()
 
-	sort.Strings(keys)
+	utils.SortKeysByValue(keys, 2, utils.DESCENDING)
 
 	var logs []LogType
 
@@ -459,7 +458,7 @@ func handleBuiltBatches(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if pastBatches > 0 && len(logs) > pastBatches {
-		logs = logs[len(logs)-pastBatches:]
+		logs = logs[:pastBatches]
 	}
 
 	info := InfoType[ResponseArray[LogType]]{
@@ -506,7 +505,7 @@ func handleCommittedSubmissionBatches(w http.ResponseWriter, r *http.Request) {
 	}
 
 	keys := redis.RedisClient.Keys(context.Background(), fmt.Sprintf("%s.%s.*", pkgs.ProcessTriggerKey, pkgs.CommitSubmissionBatch)).Val()
-	sort.Strings(keys)
+	utils.SortKeysByValue(keys, 2, utils.DESCENDING)
 
 	var logs []LogType
 
@@ -526,7 +525,7 @@ func handleCommittedSubmissionBatches(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if pastBatches > 0 && len(logs) > pastBatches {
-		logs = logs[len(logs)-pastBatches:]
+		logs = logs[:pastBatches]
 	}
 
 	info := InfoType[ResponseArray[LogType]]{
@@ -573,6 +572,8 @@ func handleBatchResubmissions(w http.ResponseWriter, r *http.Request) {
 
 	keys := redis.RedisClient.Keys(context.Background(), fmt.Sprintf("%s.%s.*", pkgs.ProcessTriggerKey, pkgs.EnsureBatchSubmissionSuccess)).Val()
 
+	utils.SortKeysByValue(keys, 2, utils.DESCENDING)
+
 	var logs []LogType
 
 	for _, key := range keys {
@@ -591,7 +592,7 @@ func handleBatchResubmissions(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if pastBatches > 0 && len(logs) > pastBatches {
-		logs = logs[len(logs)-pastBatches:]
+		logs = logs[:pastBatches]
 	}
 
 	info := InfoType[ResponseArray[LogType]]{
@@ -599,6 +600,71 @@ func handleBatchResubmissions(w http.ResponseWriter, r *http.Request) {
 		Response: logs,
 	}
 	response := Response[ResponseArray[LogType]]{
+		Info:      info,
+		RequestID: r.Context().Value("request_id").(string),
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
+}
+
+// @Summary Get stored epoch submissions count
+// @Description Retrieves the total number of submissions stored in redis for past epochs.
+// @Tags Submissions
+// @Accept json
+// @Produce json
+// @Param request body PastEpochsRequest true "Past Epochs Request"
+// @Success 200 {object} Response[int] "Successful Response"
+// @Failure 400 {string} string "Invalid request or past epochs less than 0"
+// @Failure 401 {string} string "Unauthorized: Incorrect token"
+// @Router /storedEpochSubmissionsCount [post]
+func handleStoredEpochSubmissionsCount(w http.ResponseWriter, r *http.Request) {
+	var request PastEpochsRequest
+	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	// Authenticate token
+	if request.Token != config.SettingsObj.AuthReadToken {
+		http.Error(w, "Incorrect Token!", http.StatusUnauthorized)
+		return
+	}
+
+	pastEpochs := request.PastEpochs
+	if pastEpochs < 0 {
+		http.Error(w, "Past epochs should be at least 0", http.StatusBadRequest)
+		return
+	}
+
+	keys := redis.RedisClient.Keys(context.Background(), fmt.Sprintf("%s.*", pkgs.StoredSubmissionsCount)).Val()
+	utils.SortKeysByValue(keys, 1, utils.DESCENDING)
+
+	var totalSubmissions int
+	var epochs int
+
+	if request.PastEpochs == 0 {
+		epochs = len(keys)
+	} else {
+		epochs = request.PastEpochs
+	}
+
+	for i := 0; i < epochs; i++ {
+		entry, err := redis.Get(context.Background(), keys[i])
+		if err != nil {
+			continue
+		}
+
+		if count, err := strconv.Atoi(entry); err == nil {
+			totalSubmissions += count
+		}
+	}
+
+	info := InfoType[int]{
+		Success:  true,
+		Response: totalSubmissions,
+	}
+	response := Response[int]{
 		Info:      info,
 		RequestID: r.Context().Value("request_id").(string),
 	}
@@ -637,11 +703,10 @@ func handleReceivedEpochSubmissionsCount(w http.ResponseWriter, r *http.Request)
 	}
 
 	keys := redis.RedisClient.Keys(context.Background(), fmt.Sprintf("%s.*", pkgs.EpochSubmissionsCountKey)).Val()
-	sort.Strings(keys)
+	utils.SortKeysByValue(keys, 1, utils.DESCENDING)
 
 	var totalSubmissions int
 	var epochs int
-	end := len(keys) - 1
 
 	if request.PastEpochs == 0 {
 		epochs = len(keys)
@@ -650,8 +715,7 @@ func handleReceivedEpochSubmissionsCount(w http.ResponseWriter, r *http.Request)
 	}
 
 	for i := 0; i < epochs; i++ {
-		key := keys[end-i]
-		entry, err := redis.Get(context.Background(), key)
+		entry, err := redis.Get(context.Background(), keys[i])
 		if err != nil {
 			continue
 		}
@@ -704,12 +768,10 @@ func handleIncludedEpochSubmissionsCount(w http.ResponseWriter, r *http.Request)
 	}
 
 	keys := redis.RedisClient.Keys(context.Background(), fmt.Sprintf("%s.*", pkgs.BatchIncludedSubmissionsCount)).Val()
-	sort.Strings(keys)
+	utils.SortKeysByValue(keys, 1, utils.DESCENDING)
 
 	var totalSubmissions int
 	var epochs int
-
-	end := len(keys) - 1
 
 	if request.PastEpochs == 0 {
 		epochs = len(keys)
@@ -718,8 +780,7 @@ func handleIncludedEpochSubmissionsCount(w http.ResponseWriter, r *http.Request)
 	}
 
 	for i := 0; i < epochs; i++ {
-		key := keys[end-i]
-		entry, err := redis.Get(context.Background(), key)
+		entry, err := redis.Get(context.Background(), keys[i])
 		if err != nil {
 			continue
 		}
@@ -773,7 +834,7 @@ func handleReceivedEpochSubmissions(w http.ResponseWriter, r *http.Request) {
 
 	// Fetch keys for epoch submissions
 	keys := redis.RedisClient.Keys(context.Background(), fmt.Sprintf("%s.*", pkgs.EpochSubmissionsKey)).Val()
-	sort.Strings(keys)
+	utils.SortKeysByValue(keys, 1, utils.DESCENDING)
 
 	var logs []LogType
 
@@ -797,7 +858,7 @@ func handleReceivedEpochSubmissions(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if pastEpochs > 0 && len(logs) > pastEpochs {
-		logs = logs[len(logs)-pastEpochs:]
+		logs = logs[:pastEpochs]
 	}
 
 	info := InfoType[ResponseArray[LogType]]{
@@ -1033,7 +1094,7 @@ func handleRewardUpdates(w http.ResponseWriter, r *http.Request) {
 
 	// Fetch keys for reward updates logs
 	keys := redis.RedisClient.Keys(context.Background(), fmt.Sprintf("%s.%s.*", pkgs.ProcessTriggerKey, pkgs.UpdateRewards)).Val()
-	sort.Strings(keys)
+	utils.SortKeysByValue(keys, 2, utils.DESCENDING)
 
 	var logs []LogType
 
@@ -1108,6 +1169,7 @@ func StartApiServer() {
 	mux.HandleFunc("/batchResubmissions", handleBatchResubmissions)
 	mux.HandleFunc("/receivedEpochSubmissions", handleReceivedEpochSubmissions)
 	mux.HandleFunc("/receivedEpochSubmissionsCount", handleReceivedEpochSubmissionsCount)
+	mux.HandleFunc("/storedEpochSubmissionsCount", handleStoredEpochSubmissionsCount)
 	mux.HandleFunc("/includedEpochSubmissionsCount", handleIncludedEpochSubmissionsCount)
 	mux.HandleFunc("/rewardUpdates", handleRewardUpdates)
 
