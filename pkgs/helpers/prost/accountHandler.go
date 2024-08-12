@@ -45,7 +45,24 @@ func NewAccountHandler() *AccountHandler {
 
 // InitializeAccounts TODO: This should decode the address from the private key to catch errors due to order mismatch
 func (ah *AccountHandler) initializeAccounts() {
+	sequencers, err := MustQuery[[]common.Address](context.Background(), func() ([]common.Address, error) {
+		return Instance.GetSequencers(&bind.CallOpts{}, config.SettingsObj.DataMarketContractAddress)
+	})
+
+	seqMap := make(map[string]bool)
+	for _, seq := range sequencers {
+		seqMap[seq.Hex()] = true
+	}
+
+	if err != nil {
+		errMsg := fmt.Sprintf("Unable to fetch sequencers from contract: %s", err.Error())
+		clients.SendFailureNotification("initializeAccounts", errMsg, time.Now().String(), "Fatal")
+		log.Fatalf(errMsg)
+	}
 	for i, addr := range config.SettingsObj.SignerAccountAddresses {
+		if _, ok := seqMap[addr]; !ok {
+			log.Fatalf("Account %s is not a sequencer on dataMarket %s", addr, config.SettingsObj.DataMarketAddress)
+		}
 		pk, err := crypto.HexToECDSA(config.SettingsObj.PrivateKeys[i])
 		if err != nil {
 			log.Fatalf("Failed to parse private key: %v", err)
