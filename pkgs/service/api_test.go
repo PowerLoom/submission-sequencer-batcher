@@ -1433,3 +1433,155 @@ func TestHandleReceivedEpochSubmissions(t *testing.T) {
 		})
 	}
 }
+
+func TestHandleRewardUpdates(t *testing.T) {
+	config.SettingsObj.AuthReadToken = "valid-token"
+
+	redis.Set(context.Background(), pkgs.SequencerDayKey, "5", 0)
+
+	redis.SetProcessLog(context.Background(),
+		redis.TriggeredProcessLog(pkgs.UpdateRewards, "1"),
+		map[string]interface{}{
+			"slot_ids":          []*big.Int{big.NewInt(11), big.NewInt(63), big.NewInt(1)},
+			"submission_counts": []*big.Int{big.NewInt(121), big.NewInt(263), big.NewInt(100)},
+			"signer":            "signature",
+			"timestamp":         time.Now().Unix(),
+		},
+		0,
+	)
+
+	redis.SetProcessLog(context.Background(),
+		redis.TriggeredProcessLog(pkgs.UpdateRewards, "2"),
+		map[string]interface{}{
+			"slot_ids":          []*big.Int{big.NewInt(111), big.NewInt(623), big.NewInt(10)},
+			"submission_counts": []*big.Int{big.NewInt(1221), big.NewInt(152), big.NewInt(421)},
+			"signer":            "signature",
+			"timestamp":         time.Now().Unix(),
+		},
+		0,
+	)
+
+	redis.SetProcessLog(context.Background(),
+		redis.TriggeredProcessLog(pkgs.UpdateRewards, "3"),
+		map[string]interface{}{
+			"slot_ids":          []*big.Int{big.NewInt(1), big.NewInt(557), big.NewInt(124)},
+			"submission_counts": []*big.Int{big.NewInt(792), big.NewInt(1001), big.NewInt(1234)},
+			"signer":            "signature",
+			"timestamp":         time.Now().Unix(),
+		},
+		0,
+	)
+
+	tests := []struct {
+		name       string
+		body       string
+		statusCode int
+		response   []map[string]interface{}
+	}{
+		{
+			name:       "Valid past days 0",
+			body:       `{"token": "valid-token", "past_days": 0}`,
+			statusCode: http.StatusOK,
+			response: []map[string]interface{}{
+				{
+					"slot_ids":          []*big.Int{big.NewInt(1), big.NewInt(557), big.NewInt(124)},
+					"submission_counts": []*big.Int{big.NewInt(792), big.NewInt(1001), big.NewInt(1234)},
+					"signer":            "signature",
+					"timestamp":         time.Now().Unix(),
+				},
+				{
+					"slot_ids":          []*big.Int{big.NewInt(111), big.NewInt(623), big.NewInt(10)},
+					"submission_counts": []*big.Int{big.NewInt(1221), big.NewInt(152), big.NewInt(421)},
+					"signer":            "signature",
+					"timestamp":         time.Now().Unix(),
+				},
+				{
+					"slot_ids":          []*big.Int{big.NewInt(11), big.NewInt(63), big.NewInt(1)},
+					"submission_counts": []*big.Int{big.NewInt(121), big.NewInt(263), big.NewInt(100)},
+					"signer":            "signature",
+					"timestamp":         time.Now().Unix(),
+				},
+			},
+		},
+		{
+			name:       "Valid past days 2",
+			body:       `{"token": "valid-token", "past_days": 2}`,
+			statusCode: http.StatusOK,
+			response: []map[string]interface{}{
+				{
+					"slot_ids":          []*big.Int{big.NewInt(1), big.NewInt(557), big.NewInt(124)},
+					"submission_counts": []*big.Int{big.NewInt(792), big.NewInt(1001), big.NewInt(1234)},
+					"signer":            "signature",
+					"timestamp":         time.Now().Unix(),
+				},
+				{
+					"slot_ids":          []*big.Int{big.NewInt(111), big.NewInt(623), big.NewInt(10)},
+					"submission_counts": []*big.Int{big.NewInt(1221), big.NewInt(152), big.NewInt(421)},
+					"signer":            "signature",
+					"timestamp":         time.Now().Unix(),
+				},
+			},
+		},
+		{
+			name:       "Valid past days 1",
+			body:       `{"token": "valid-token", "past_days": 1}`,
+			statusCode: http.StatusOK,
+			response: []map[string]interface{}{
+				{
+					"slot_ids":          []*big.Int{big.NewInt(1), big.NewInt(557), big.NewInt(124)},
+					"submission_counts": []*big.Int{big.NewInt(792), big.NewInt(1001), big.NewInt(1234)},
+					"signer":            "signature",
+					"timestamp":         time.Now().Unix(),
+				},
+			},
+		},
+		{
+			name:       "Invalid past days -1",
+			body:       `{"token": "valid-token", "past_days": 0-1`,
+			statusCode: http.StatusBadRequest,
+			response: []map[string]interface{}{
+				{
+					"slot_ids":          []*big.Int{big.NewInt(1), big.NewInt(557), big.NewInt(124)},
+					"submission_counts": []*big.Int{big.NewInt(792), big.NewInt(1001), big.NewInt(1234)},
+					"signer":            "signature",
+					"timestamp":         time.Now().Unix(),
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req, err := http.NewRequest("POST", "/rewardUpdates", strings.NewReader(tt.body))
+			if err != nil {
+				t.Fatal(err)
+			}
+			req.Header.Set("Content-Type", "application/json")
+
+			rr := httptest.NewRecorder()
+			handler := http.HandlerFunc(handleRewardUpdates)
+			testHandler := RequestMiddleware(handler)
+			testHandler.ServeHTTP(rr, req)
+
+			responseBody := rr.Body.String()
+			t.Log("Response Body:", responseBody)
+
+			assert.Equal(t, tt.statusCode, rr.Code)
+
+			if tt.statusCode == http.StatusOK {
+				var response struct {
+					Info struct {
+						Success  bool                     `json:"success"`
+						Response []map[string]interface{} `json:"response"`
+					} `json:"info"`
+					RequestID string `json:"request_id"`
+				}
+				err = json.NewDecoder(rr.Body).Decode(&response)
+				assert.NoError(t, err)
+				actualResp, _ := json.Marshal(tt.response)
+				expectedResp, _ := json.Marshal(response.Info.Response)
+				assert.JSONEq(t, string(expectedResp), string(actualResp))
+			}
+		})
+	}
+}

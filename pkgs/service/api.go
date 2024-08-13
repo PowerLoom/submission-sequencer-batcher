@@ -307,9 +307,16 @@ func handleFinalizedBatchSubmissions(w http.ResponseWriter, r *http.Request) {
 	utils.SortKeysByValue(keys, 2, utils.DESCENDING)
 
 	var logs []LogType
+	var end int
 
-	for _, key := range keys {
-		entry, err := redis.Get(context.Background(), key)
+	if pastEpochs == 0 {
+		end = len(keys)
+	} else {
+		end = pastEpochs
+	}
+
+	for i := 0; i < end; i++ {
+		entry, err := redis.Get(context.Background(), keys[i])
 		if err != nil {
 			continue
 		}
@@ -321,10 +328,6 @@ func handleFinalizedBatchSubmissions(w http.ResponseWriter, r *http.Request) {
 		}
 
 		logs = append(logs, logEntry)
-	}
-
-	if pastEpochs > 0 && len(logs) > pastEpochs {
-		logs = logs[:pastEpochs]
 	}
 
 	info := InfoType[ResponseArray[LogType]]{
@@ -373,9 +376,16 @@ func handleTriggeredCollectionFlows(w http.ResponseWriter, r *http.Request) {
 	utils.SortKeysByValue(keys, 2, utils.DESCENDING)
 
 	var logs []LogType
+	var end int
 
-	for _, key := range keys {
-		entry, err := redis.Get(context.Background(), key)
+	if pastEpochs == 0 {
+		end = len(keys)
+	} else {
+		end = pastEpochs
+	}
+
+	for i := 0; i < end; i++ {
+		entry, err := redis.Get(context.Background(), keys[i])
 		if err != nil {
 			continue
 		}
@@ -387,10 +397,6 @@ func handleTriggeredCollectionFlows(w http.ResponseWriter, r *http.Request) {
 		}
 
 		logs = append(logs, logEntry)
-	}
-
-	if pastEpochs > 0 && len(logs) > pastEpochs {
-		logs = logs[:pastEpochs]
 	}
 
 	info := InfoType[ResponseArray[LogType]]{
@@ -441,9 +447,16 @@ func handleBuiltBatches(w http.ResponseWriter, r *http.Request) {
 	utils.SortKeysByValue(keys, 2, utils.DESCENDING)
 
 	var logs []LogType
+	var end int
 
-	for _, key := range keys {
-		entry, err := redis.Get(context.Background(), key)
+	if pastBatches == 0 {
+		end = len(keys)
+	} else {
+		end = pastBatches
+	}
+
+	for i := 0; i < end; i++ {
+		entry, err := redis.Get(context.Background(), keys[i])
 		if err != nil {
 			continue
 		}
@@ -455,10 +468,6 @@ func handleBuiltBatches(w http.ResponseWriter, r *http.Request) {
 		}
 
 		logs = append(logs, logEntry)
-	}
-
-	if pastBatches > 0 && len(logs) > pastBatches {
-		logs = logs[:pastBatches]
 	}
 
 	info := InfoType[ResponseArray[LogType]]{
@@ -508,9 +517,16 @@ func handleCommittedSubmissionBatches(w http.ResponseWriter, r *http.Request) {
 	utils.SortKeysByValue(keys, 2, utils.DESCENDING)
 
 	var logs []LogType
+	var end int
 
-	for _, key := range keys {
-		entry, err := redis.Get(context.Background(), key)
+	if pastBatches == 0 {
+		end = len(keys)
+	} else {
+		end = pastBatches
+	}
+
+	for i := 0; i < end; i++ {
+		entry, err := redis.Get(context.Background(), keys[i])
 		if err != nil {
 			continue
 		}
@@ -522,10 +538,6 @@ func handleCommittedSubmissionBatches(w http.ResponseWriter, r *http.Request) {
 		}
 
 		logs = append(logs, logEntry)
-	}
-
-	if pastBatches > 0 && len(logs) > pastBatches {
-		logs = logs[:pastBatches]
 	}
 
 	info := InfoType[ResponseArray[LogType]]{
@@ -575,9 +587,16 @@ func handleBatchResubmissions(w http.ResponseWriter, r *http.Request) {
 	utils.SortKeysByValue(keys, 2, utils.DESCENDING)
 
 	var logs []LogType
+	var end int
 
-	for _, key := range keys {
-		entry, err := redis.Get(context.Background(), key)
+	if pastBatches == 0 {
+		end = len(keys)
+	} else {
+		end = pastBatches
+	}
+
+	for i := 0; i < end; i++ {
+		entry, err := redis.Get(context.Background(), keys[i])
 		if err != nil {
 			continue
 		}
@@ -589,10 +608,6 @@ func handleBatchResubmissions(w http.ResponseWriter, r *http.Request) {
 		}
 
 		logs = append(logs, logEntry)
-	}
-
-	if pastBatches > 0 && len(logs) > pastBatches {
-		logs = logs[:pastBatches]
 	}
 
 	info := InfoType[ResponseArray[LogType]]{
@@ -1076,40 +1091,21 @@ func handleRewardUpdates(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Fetch the current day from the Redis or any other source
-	currentDayStr, _ := redis.Get(context.Background(), pkgs.SequencerDayKey)
-	if currentDayStr == "" {
-		// Handle error appropriately if the current day can't be fetched
-		http.Error(w, "Failed to fetch current day", http.StatusInternalServerError)
-		return
-	}
-	currentDay, err := strconv.Atoi(currentDayStr)
-	if err != nil {
-		http.Error(w, "Invalid current day format", http.StatusInternalServerError)
-		return
-	}
-
-	// Calculate the range of days to fetch logs for
-	startDay := currentDay - pastDays + 1
-
 	// Fetch keys for reward updates logs
 	keys := redis.RedisClient.Keys(context.Background(), fmt.Sprintf("%s.%s.*", pkgs.ProcessTriggerKey, pkgs.UpdateRewards)).Val()
 	utils.SortKeysByValue(keys, 2, utils.DESCENDING)
 
 	var logs []LogType
+	var end int
 
+	if pastDays == 0 {
+		end = len(keys)
+	} else {
+		end = pastDays
+	}
 	// Filter keys that pertain to the specified range of past days
-	for _, key := range keys {
-		parts := strings.Split(key, ".")
-		if len(parts) < 2 {
-			continue
-		}
-		day, err := strconv.Atoi(parts[len(parts)-1])
-		if err != nil || day < startDay || day > currentDay {
-			continue
-		}
-
-		entry, err := redis.Get(context.Background(), key)
+	for i := 0; i < end; i++ {
+		entry, err := redis.Get(context.Background(), keys[i])
 		if err != nil {
 			continue
 		}
