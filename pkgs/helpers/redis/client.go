@@ -96,6 +96,20 @@ func SetProcessLog(ctx context.Context, key string, logEntry map[string]interfac
 	return nil
 }
 
+func UpdateProcessLogTable(ctx context.Context, table, key string, logEntry map[string]interface{}) error {
+	data, err := json.Marshal(logEntry)
+	if err != nil {
+		return fmt.Errorf("failed to marshal log entry: %w", err)
+	}
+
+	err = RedisClient.HSet(ctx, table, key, data).Err()
+	if err != nil {
+		return fmt.Errorf("failed to set log entry in Redis: %w", err)
+	}
+
+	return nil
+}
+
 // Used across multiple routines - prevents race conditions
 func LockUpdateHashTable(table, key, value string) error {
 	mutex.Lock()
