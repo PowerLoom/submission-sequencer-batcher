@@ -45,6 +45,9 @@ func BuildBatchSubmissions(epochId *big.Int, headers []string) ([]*ipfs.BatchSub
 	}
 	log.Debugf("Fetched %d keys for epoch %d", len(keys), epochId)
 
+	// Setting stored submissions count in redis for further logging
+	redis.Set(context.Background(), redis.StoredSubmissionsByEpoch(epochId.String()), strconv.Itoa(len(keys)), 4*time.Hour)
+
 	if len(keys) == 0 {
 		log.Debugf("no submissions for epoch: %s, with headers: %s", epochId.String(), headers)
 		return []*ipfs.BatchSubmission{}, errors.New("no submissions for epoch")
@@ -269,6 +272,11 @@ func BuildBatch(dataIds, data []string, id int, epochId *big.Int, tree *imt.Incr
 		if err = redis.SetProcessLog(context.Background(), redis.TriggeredProcessLog(pkgs.BuildBatch, strconv.Itoa(id)), logEntry, 4*time.Hour); err != nil {
 			clients.SendFailureNotification("BuildBatch", err.Error(), time.Now().String(), "High")
 			log.Errorln("BuildBatch process log error: ", err.Error())
+		}
+
+		if err = redis.RedisClient.IncrBy(context.Background(), redis.BatchIncludedSubmissionsCountByEpoch(epochId.String()), int64(len(data))).Err(); err != nil {
+			clients.SendFailureNotification("BuildBatch", err.Error(), time.Now().String(), "High")
+			log.Errorln("BuildBatch failed to update included submissions count, error: ", err.Error())
 		}
 
 		cidTree, _ := imt.New()

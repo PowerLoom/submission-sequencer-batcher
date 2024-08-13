@@ -435,10 +435,10 @@ func TestHandleFinalizedBatchSubmissions(t *testing.T) {
 			statusCode: http.StatusOK,
 			response: []map[string]interface{}{
 				{
-					"epoch_id":                "1",
-					"finalized_batches_count": 3,
-					"finalized_batch_ids":     []string{"1", "2", "3"},
-					"timestamp":               float64(123456),
+					"epoch_id":                "3",
+					"finalized_batches_count": 5,
+					"finalized_batch_ids":     []interface{}{"5", "6", "7", "8", "9"},
+					"timestamp":               float64(123456789),
 				},
 				{
 					"epoch_id":                "2",
@@ -447,10 +447,10 @@ func TestHandleFinalizedBatchSubmissions(t *testing.T) {
 					"timestamp":               float64(12345678),
 				},
 				{
-					"epoch_id":                "3",
-					"finalized_batches_count": 5,
-					"finalized_batch_ids":     []interface{}{"5", "6", "7", "8", "9"},
-					"timestamp":               float64(123456789),
+					"epoch_id":                "1",
+					"finalized_batches_count": 3,
+					"finalized_batch_ids":     []string{"1", "2", "3"},
+					"timestamp":               float64(123456),
 				},
 			},
 		},
@@ -568,11 +568,11 @@ func TestHandleTriggeredCollectionFlows(t *testing.T) {
 			statusCode: http.StatusOK,
 			response: []map[string]interface{}{
 				{
-					"epoch_id":      "12",
-					"start_block":   "100",
-					"current_block": "220",
+					"epoch_id":      "14",
+					"start_block":   "340",
+					"current_block": "460",
 					"header_count":  "120",
-					"timestamp":     float64(123456),
+					"timestamp":     float64(123456789),
 				},
 				{
 					"epoch_id":      "13",
@@ -582,11 +582,11 @@ func TestHandleTriggeredCollectionFlows(t *testing.T) {
 					"timestamp":     float64(12345678),
 				},
 				{
-					"epoch_id":      "14",
-					"start_block":   "340",
-					"current_block": "460",
+					"epoch_id":      "12",
+					"start_block":   "100",
+					"current_block": "220",
 					"header_count":  "120",
-					"timestamp":     float64(123456789),
+					"timestamp":     float64(123456),
 				},
 			},
 		},
@@ -708,12 +708,12 @@ func TestHandleBuiltBatches(t *testing.T) {
 			statusCode: http.StatusOK,
 			response: []map[string]interface{}{
 				{
-					"epoch_id":          "1",
-					"batch_id":          float64(1),
-					"batch_cid":         "cid1",
-					"submissions_count": float64(3),
-					"submissions":       []interface{}{"sub1", "sub2", "sub3"},
-					"timestamp":         float64(123456),
+					"epoch_id":          "3",
+					"batch_id":          float64(3),
+					"batch_cid":         "cid3",
+					"submissions_count": float64(5),
+					"submissions":       []interface{}{"sub5", "sub6", "sub7", "sub8", "sub9"},
+					"timestamp":         float64(123456789),
 				},
 				{
 					"epoch_id":          "2",
@@ -724,12 +724,12 @@ func TestHandleBuiltBatches(t *testing.T) {
 					"timestamp":         float64(12345678),
 				},
 				{
-					"epoch_id":          "3",
-					"batch_id":          float64(3),
-					"batch_cid":         "cid3",
-					"submissions_count": float64(5),
-					"submissions":       []interface{}{"sub5", "sub6", "sub7", "sub8", "sub9"},
-					"timestamp":         float64(123456789),
+					"epoch_id":          "1",
+					"batch_id":          float64(1),
+					"batch_cid":         "cid1",
+					"submissions_count": float64(3),
+					"submissions":       []interface{}{"sub1", "sub2", "sub3"},
+					"timestamp":         float64(123456),
 				},
 			},
 		},
@@ -851,12 +851,12 @@ func TestHandleCommittedSubmissionBatches(t *testing.T) {
 			statusCode: http.StatusOK,
 			response: []map[string]interface{}{
 				{
-					"epoch_id":  "1",
-					"batch_id":  float64(1),
-					"tx_hash":   "0x123",
-					"signer":    "0xabc",
-					"nonce":     "1",
-					"timestamp": float64(123456),
+					"epoch_id":  "3",
+					"batch_id":  float64(3),
+					"tx_hash":   "0x789",
+					"signer":    "0xghi",
+					"nonce":     "3",
+					"timestamp": float64(123456789),
 				},
 				{
 					"epoch_id":  "2",
@@ -867,12 +867,12 @@ func TestHandleCommittedSubmissionBatches(t *testing.T) {
 					"timestamp": float64(12345678),
 				},
 				{
-					"epoch_id":  "3",
-					"batch_id":  float64(3),
-					"tx_hash":   "0x789",
-					"signer":    "0xghi",
-					"nonce":     "3",
-					"timestamp": float64(123456789),
+					"epoch_id":  "1",
+					"batch_id":  float64(1),
+					"tx_hash":   "0x123",
+					"signer":    "0xabc",
+					"nonce":     "1",
+					"timestamp": float64(123456),
 				},
 			},
 		},
@@ -994,12 +994,12 @@ func TestHandleBatchResubmissions(t *testing.T) {
 			statusCode: http.StatusOK,
 			response: []map[string]interface{}{
 				{
-					"epoch_id":  "1",
-					"batch_id":  float64(1),
-					"tx_hash":   "0x123",
-					"signer":    "0xabc",
-					"nonce":     "1",
-					"timestamp": float64(123456),
+					"epoch_id":  "3",
+					"batch_id":  float64(3),
+					"tx_hash":   "0x789",
+					"signer":    "0xghi",
+					"nonce":     "3",
+					"timestamp": float64(123456789),
 				},
 				{
 					"epoch_id":  "2",
@@ -1010,12 +1010,12 @@ func TestHandleBatchResubmissions(t *testing.T) {
 					"timestamp": float64(12345678),
 				},
 				{
-					"epoch_id":  "3",
-					"batch_id":  float64(3),
-					"tx_hash":   "0x789",
-					"signer":    "0xghi",
-					"nonce":     "3",
-					"timestamp": float64(123456789),
+					"epoch_id":  "1",
+					"batch_id":  float64(1),
+					"tx_hash":   "0x123",
+					"signer":    "0xabc",
+					"nonce":     "1",
+					"timestamp": float64(123456),
 				},
 			},
 		},
@@ -1071,44 +1071,10 @@ func TestHandleBatchResubmissions(t *testing.T) {
 
 func TestHandleIncludedEpochSubmissionsCount(t *testing.T) {
 	config.SettingsObj.AuthReadToken = "valid-token"
-	redis.SetProcessLog(context.Background(),
-		redis.TriggeredProcessLog(pkgs.BuildBatch, "1"),
-		map[string]interface{}{
-			"epoch_id":          "1",
-			"batch_id":          1,
-			"batch_cid":         "cid1",
-			"submissions_count": 3,
-			"submissions":       []interface{}{"sub1", "sub2", "sub3"},
-			"timestamp":         float64(123456),
-		},
-		0,
-	)
-
-	redis.SetProcessLog(context.Background(),
-		redis.TriggeredProcessLog(pkgs.BuildBatch, "2"),
-		map[string]interface{}{
-			"epoch_id":          "2",
-			"batch_id":          2,
-			"batch_cid":         "cid2",
-			"submissions_count": 1,
-			"submissions":       []interface{}{"sub4"},
-			"timestamp":         float64(12345678),
-		},
-		0,
-	)
-
-	redis.SetProcessLog(context.Background(),
-		redis.TriggeredProcessLog(pkgs.BuildBatch, "3"),
-		map[string]interface{}{
-			"epoch_id":          "3",
-			"batch_id":          3,
-			"batch_cid":         "cid3",
-			"submissions_count": 5,
-			"submissions":       []interface{}{"sub5", "sub6", "sub7", "sub8", "sub9"},
-			"timestamp":         float64(123456789),
-		},
-		0,
-	)
+	redis.Set(context.Background(), redis.BatchIncludedSubmissionsCountByEpoch("11"), "2", time.Hour)
+	redis.Set(context.Background(), redis.BatchIncludedSubmissionsCountByEpoch("3"), "4", time.Hour)
+	redis.Set(context.Background(), redis.BatchIncludedSubmissionsCountByEpoch("21"), "7", time.Hour)
+	redis.Set(context.Background(), redis.BatchIncludedSubmissionsCountByEpoch("7"), "12", time.Hour)
 
 	tests := []struct {
 		name       string
@@ -1120,13 +1086,13 @@ func TestHandleIncludedEpochSubmissionsCount(t *testing.T) {
 			name:       "Valid token, all epochs",
 			body:       `{"token": "valid-token", "past_epochs": 0}`,
 			statusCode: http.StatusOK,
-			response:   9,
+			response:   25,
 		},
 		{
 			name:       "Valid token, specific epochs",
 			body:       `{"token": "valid-token", "past_epochs": 2}`,
 			statusCode: http.StatusOK,
-			response:   6,
+			response:   9,
 		},
 		{
 			name:       "Invalid token",
@@ -1178,9 +1144,10 @@ func TestHandleIncludedEpochSubmissionsCount(t *testing.T) {
 
 func TestHandleReceivedEpochSubmissionsCount(t *testing.T) {
 	config.SettingsObj.AuthReadToken = "valid-token"
-	redis.Set(context.Background(), redis.EpochSubmissionsCount(1), "3", time.Hour)
+	redis.Set(context.Background(), redis.EpochSubmissionsCount(11), "7", time.Hour)
 	redis.Set(context.Background(), redis.EpochSubmissionsCount(2), "1", time.Hour)
-	redis.Set(context.Background(), redis.EpochSubmissionsCount(3), "5", time.Hour)
+	redis.Set(context.Background(), redis.EpochSubmissionsCount(37), "5", time.Hour)
+	redis.Set(context.Background(), redis.EpochSubmissionsCount(21), "8", time.Hour)
 
 	tests := []struct {
 		name       string
@@ -1192,13 +1159,13 @@ func TestHandleReceivedEpochSubmissionsCount(t *testing.T) {
 			name:       "Valid token, all epochs",
 			body:       `{"token": "valid-token", "past_epochs": 0}`,
 			statusCode: http.StatusOK,
-			response:   9,
+			response:   21,
 		},
 		{
 			name:       "Valid token, specific epochs",
-			body:       `{"token": "valid-token", "past_epochs": 2}`,
+			body:       `{"token": "valid-token", "past_epochs": 3}`,
 			statusCode: http.StatusOK,
-			response:   6,
+			response:   20,
 		},
 		{
 			name:       "Invalid token",
@@ -1248,15 +1215,88 @@ func TestHandleReceivedEpochSubmissionsCount(t *testing.T) {
 	}
 }
 
+func TestHandleStoredEpochSubmissionsCount(t *testing.T) {
+	config.SettingsObj.AuthReadToken = "valid-token"
+	redis.Set(context.Background(), redis.StoredSubmissionsByEpoch("11"), "3", time.Hour)
+	redis.Set(context.Background(), redis.StoredSubmissionsByEpoch("3"), "1", time.Hour)
+	redis.Set(context.Background(), redis.StoredSubmissionsByEpoch("21"), "5", time.Hour)
+	redis.Set(context.Background(), redis.StoredSubmissionsByEpoch("7"), "5", time.Hour)
+
+	tests := []struct {
+		name       string
+		body       string
+		statusCode int
+		response   int
+	}{
+		{
+			name:       "Valid token, all epochs",
+			body:       `{"token": "valid-token", "past_epochs": 0}`,
+			statusCode: http.StatusOK,
+			response:   14,
+		},
+		{
+			name:       "Valid token, specific epochs",
+			body:       `{"token": "valid-token", "past_epochs": 2}`,
+			statusCode: http.StatusOK,
+			response:   8,
+		},
+		{
+			name:       "Invalid token",
+			body:       `{"token": "invalid-token", "past_epochs": 1}`,
+			statusCode: http.StatusUnauthorized,
+			response:   0,
+		},
+		{
+			name:       "Negative past epochs",
+			body:       `{"token": "valid-token", "past_epochs": -1}`,
+			statusCode: http.StatusBadRequest,
+			response:   0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req, err := http.NewRequest("POST", "/receivedEpochSubmissionsCount", strings.NewReader(tt.body))
+			if err != nil {
+				t.Fatal(err)
+			}
+			req.Header.Set("Content-Type", "application/json")
+
+			rr := httptest.NewRecorder()
+			handler := http.HandlerFunc(handleStoredEpochSubmissionsCount)
+			testHandler := RequestMiddleware(handler)
+			testHandler.ServeHTTP(rr, req)
+
+			responseBody := rr.Body.String()
+			t.Log("Response Body:", responseBody)
+
+			assert.Equal(t, tt.statusCode, rr.Code)
+
+			if tt.statusCode == http.StatusOK {
+				var response struct {
+					Info struct {
+						Success  bool `json:"success"`
+						Response int  `json:"response"`
+					} `json:"info"`
+					RequestID string `json:"request_id"`
+				}
+				err = json.NewDecoder(rr.Body).Decode(&response)
+				assert.NoError(t, err)
+				assert.Equal(t, tt.response, response.Info.Response)
+			}
+		})
+	}
+}
+
 func TestHandleReceivedEpochSubmissions(t *testing.T) {
 	config.SettingsObj.AuthReadToken = "valid-token"
 
 	// Set test data in Redis
-	redis.RedisClient.HSet(context.Background(), redis.EpochSubmissionsKey(1), "submission1", `{"request": {"slotId": 1, "epochId": 1}}`)
-	redis.RedisClient.HSet(context.Background(), redis.EpochSubmissionsKey(1), "submission2", `{"request": {"slotId": 1, "epochId": 1}}`)
-	redis.RedisClient.HSet(context.Background(), redis.EpochSubmissionsKey(2), "submission3", `{"request": {"slotId": 1, "epochId": 2}}`)
-	redis.RedisClient.HSet(context.Background(), redis.EpochSubmissionsKey(2), "submission4", `{"request": {"slotId": 1, "epochId": 2}}`)
 	redis.RedisClient.HSet(context.Background(), redis.EpochSubmissionsKey(3), "submission5", `{"request": {"slotId": 1, "epochId": 3}}`)
+	redis.RedisClient.HSet(context.Background(), redis.EpochSubmissionsKey(1), "submission1", `{"request": {"slotId": 1, "epochId": 1}}`)
+	redis.RedisClient.HSet(context.Background(), redis.EpochSubmissionsKey(21), "submission3", `{"request": {"slotId": 1, "epochId": 21}}`)
+	redis.RedisClient.HSet(context.Background(), redis.EpochSubmissionsKey(11), "submission2", `{"request": {"slotId": 1, "epochId": 11}}`)
+	redis.RedisClient.HSet(context.Background(), redis.EpochSubmissionsKey(2), "submission4", `{"request": {"slotId": 1, "epochId": 2}}`)
 
 	tests := []struct {
 		name       string
@@ -1270,12 +1310,12 @@ func TestHandleReceivedEpochSubmissions(t *testing.T) {
 			statusCode: http.StatusOK,
 			response: []map[string]interface{}{
 				{
-					"epoch_id": "3",
+					"epoch_id": "21",
 					"submissions": map[string]interface{}{
-						"submission5": map[string]interface{}{
+						"submission3": map[string]interface{}{
 							"request": map[string]interface{}{
 								"slotId":  1,
-								"epochId": 3,
+								"epochId": 21,
 							},
 						},
 					},
@@ -1288,35 +1328,23 @@ func TestHandleReceivedEpochSubmissions(t *testing.T) {
 			statusCode: http.StatusOK,
 			response: []map[string]interface{}{
 				{
-					"epoch_id": "1",
+					"epoch_id": "21",
 					"submissions": map[string]interface{}{
-						"submission1": map[string]interface{}{
+						"submission3": map[string]interface{}{
 							"request": map[string]interface{}{
 								"slotId":  1,
-								"epochId": 1,
-							},
-						},
-						"submission2": map[string]interface{}{
-							"request": map[string]interface{}{
-								"slotId":  1,
-								"epochId": 1,
+								"epochId": 21,
 							},
 						},
 					},
 				},
 				{
-					"epoch_id": "2",
+					"epoch_id": "11",
 					"submissions": map[string]interface{}{
-						"submission3": map[string]interface{}{
+						"submission2": map[string]interface{}{
 							"request": map[string]interface{}{
 								"slotId":  1,
-								"epochId": 2,
-							},
-						},
-						"submission4": map[string]interface{}{
-							"request": map[string]interface{}{
-								"slotId":  1,
-								"epochId": 2,
+								"epochId": 11,
 							},
 						},
 					},
@@ -1328,6 +1356,28 @@ func TestHandleReceivedEpochSubmissions(t *testing.T) {
 							"request": map[string]interface{}{
 								"slotId":  1,
 								"epochId": 3,
+							},
+						},
+					},
+				},
+				{
+					"epoch_id": "2",
+					"submissions": map[string]interface{}{
+						"submission4": map[string]interface{}{
+							"request": map[string]interface{}{
+								"slotId":  1,
+								"epochId": 2,
+							},
+						},
+					},
+				},
+				{
+					"epoch_id": "1",
+					"submissions": map[string]interface{}{
+						"submission1": map[string]interface{}{
+							"request": map[string]interface{}{
+								"slotId":  1,
+								"epochId": 1,
 							},
 						},
 					},
@@ -1358,6 +1408,158 @@ func TestHandleReceivedEpochSubmissions(t *testing.T) {
 
 			rr := httptest.NewRecorder()
 			handler := http.HandlerFunc(handleReceivedEpochSubmissions)
+			testHandler := RequestMiddleware(handler)
+			testHandler.ServeHTTP(rr, req)
+
+			responseBody := rr.Body.String()
+			t.Log("Response Body:", responseBody)
+
+			assert.Equal(t, tt.statusCode, rr.Code)
+
+			if tt.statusCode == http.StatusOK {
+				var response struct {
+					Info struct {
+						Success  bool                     `json:"success"`
+						Response []map[string]interface{} `json:"response"`
+					} `json:"info"`
+					RequestID string `json:"request_id"`
+				}
+				err = json.NewDecoder(rr.Body).Decode(&response)
+				assert.NoError(t, err)
+				actualResp, _ := json.Marshal(tt.response)
+				expectedResp, _ := json.Marshal(response.Info.Response)
+				assert.JSONEq(t, string(expectedResp), string(actualResp))
+			}
+		})
+	}
+}
+
+func TestHandleRewardUpdates(t *testing.T) {
+	config.SettingsObj.AuthReadToken = "valid-token"
+
+	redis.Set(context.Background(), pkgs.SequencerDayKey, "5", 0)
+
+	redis.SetProcessLog(context.Background(),
+		redis.TriggeredProcessLog(pkgs.UpdateRewards, "1"),
+		map[string]interface{}{
+			"slot_ids":          []*big.Int{big.NewInt(11), big.NewInt(63), big.NewInt(1)},
+			"submission_counts": []*big.Int{big.NewInt(121), big.NewInt(263), big.NewInt(100)},
+			"signer":            "signature",
+			"timestamp":         time.Now().Unix(),
+		},
+		0,
+	)
+
+	redis.SetProcessLog(context.Background(),
+		redis.TriggeredProcessLog(pkgs.UpdateRewards, "2"),
+		map[string]interface{}{
+			"slot_ids":          []*big.Int{big.NewInt(111), big.NewInt(623), big.NewInt(10)},
+			"submission_counts": []*big.Int{big.NewInt(1221), big.NewInt(152), big.NewInt(421)},
+			"signer":            "signature",
+			"timestamp":         time.Now().Unix(),
+		},
+		0,
+	)
+
+	redis.SetProcessLog(context.Background(),
+		redis.TriggeredProcessLog(pkgs.UpdateRewards, "3"),
+		map[string]interface{}{
+			"slot_ids":          []*big.Int{big.NewInt(1), big.NewInt(557), big.NewInt(124)},
+			"submission_counts": []*big.Int{big.NewInt(792), big.NewInt(1001), big.NewInt(1234)},
+			"signer":            "signature",
+			"timestamp":         time.Now().Unix(),
+		},
+		0,
+	)
+
+	tests := []struct {
+		name       string
+		body       string
+		statusCode int
+		response   []map[string]interface{}
+	}{
+		{
+			name:       "Valid past days 0",
+			body:       `{"token": "valid-token", "past_days": 0}`,
+			statusCode: http.StatusOK,
+			response: []map[string]interface{}{
+				{
+					"slot_ids":          []*big.Int{big.NewInt(1), big.NewInt(557), big.NewInt(124)},
+					"submission_counts": []*big.Int{big.NewInt(792), big.NewInt(1001), big.NewInt(1234)},
+					"signer":            "signature",
+					"timestamp":         time.Now().Unix(),
+				},
+				{
+					"slot_ids":          []*big.Int{big.NewInt(111), big.NewInt(623), big.NewInt(10)},
+					"submission_counts": []*big.Int{big.NewInt(1221), big.NewInt(152), big.NewInt(421)},
+					"signer":            "signature",
+					"timestamp":         time.Now().Unix(),
+				},
+				{
+					"slot_ids":          []*big.Int{big.NewInt(11), big.NewInt(63), big.NewInt(1)},
+					"submission_counts": []*big.Int{big.NewInt(121), big.NewInt(263), big.NewInt(100)},
+					"signer":            "signature",
+					"timestamp":         time.Now().Unix(),
+				},
+			},
+		},
+		{
+			name:       "Valid past days 2",
+			body:       `{"token": "valid-token", "past_days": 2}`,
+			statusCode: http.StatusOK,
+			response: []map[string]interface{}{
+				{
+					"slot_ids":          []*big.Int{big.NewInt(1), big.NewInt(557), big.NewInt(124)},
+					"submission_counts": []*big.Int{big.NewInt(792), big.NewInt(1001), big.NewInt(1234)},
+					"signer":            "signature",
+					"timestamp":         time.Now().Unix(),
+				},
+				{
+					"slot_ids":          []*big.Int{big.NewInt(111), big.NewInt(623), big.NewInt(10)},
+					"submission_counts": []*big.Int{big.NewInt(1221), big.NewInt(152), big.NewInt(421)},
+					"signer":            "signature",
+					"timestamp":         time.Now().Unix(),
+				},
+			},
+		},
+		{
+			name:       "Valid past days 1",
+			body:       `{"token": "valid-token", "past_days": 1}`,
+			statusCode: http.StatusOK,
+			response: []map[string]interface{}{
+				{
+					"slot_ids":          []*big.Int{big.NewInt(1), big.NewInt(557), big.NewInt(124)},
+					"submission_counts": []*big.Int{big.NewInt(792), big.NewInt(1001), big.NewInt(1234)},
+					"signer":            "signature",
+					"timestamp":         time.Now().Unix(),
+				},
+			},
+		},
+		{
+			name:       "Invalid past days -1",
+			body:       `{"token": "valid-token", "past_days": 0-1`,
+			statusCode: http.StatusBadRequest,
+			response: []map[string]interface{}{
+				{
+					"slot_ids":          []*big.Int{big.NewInt(1), big.NewInt(557), big.NewInt(124)},
+					"submission_counts": []*big.Int{big.NewInt(792), big.NewInt(1001), big.NewInt(1234)},
+					"signer":            "signature",
+					"timestamp":         time.Now().Unix(),
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req, err := http.NewRequest("POST", "/rewardUpdates", strings.NewReader(tt.body))
+			if err != nil {
+				t.Fatal(err)
+			}
+			req.Header.Set("Content-Type", "application/json")
+
+			rr := httptest.NewRecorder()
+			handler := http.HandlerFunc(handleRewardUpdates)
 			testHandler := RequestMiddleware(handler)
 			testHandler.ServeHTTP(rr, req)
 

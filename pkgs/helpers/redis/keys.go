@@ -21,6 +21,14 @@ func EpochSubmissionsCount(epochId uint64) string {
 	return fmt.Sprintf("%s.%d", pkgs.EpochSubmissionsCountKey, epochId)
 }
 
+func StoredSubmissionsByEpoch(epochId string) string {
+	return fmt.Sprintf("%s.%s", pkgs.StoredSubmissionsCount, epochId)
+}
+
+func BatchIncludedSubmissionsCountByEpoch(epochId string) string {
+	return fmt.Sprintf("%s.%s", pkgs.BatchIncludedSubmissionsCount, epochId)
+}
+
 func EpochSubmissionsKey(epochId uint64) string {
 	return fmt.Sprintf("%s.%d", pkgs.EpochSubmissionsKey, epochId)
 }

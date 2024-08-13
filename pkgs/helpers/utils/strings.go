@@ -1,6 +1,15 @@
 package utils
 
-import "strings"
+import (
+	"sort"
+	"strconv"
+	"strings"
+)
+
+const (
+	ASCENDING  = 0
+	DESCENDING = 1
+)
 
 func ExtractField(str, fieldName string) string {
 	start := strings.Index(str, fieldName+":")
@@ -26,4 +35,15 @@ func AppendToLogEntry(logEntry map[string]interface{}, key string, value interfa
 	} else {
 		logEntry[key] = []interface{}{value}
 	}
+}
+
+func SortKeysByValue(keys []string, index int, order int) {
+	sort.Slice(keys, func(i, j int) bool {
+		numI, _ := strconv.Atoi(strings.Split(keys[i], ".")[index])
+		numJ, _ := strconv.Atoi(strings.Split(keys[j], ".")[index])
+		if order == ASCENDING {
+			return numI < numJ
+		}
+		return numI > numJ
+	})
 }
