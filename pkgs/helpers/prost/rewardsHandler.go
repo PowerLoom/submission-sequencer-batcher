@@ -8,12 +8,13 @@ import (
 	"collector/pkgs/helpers/redis"
 	"context"
 	"fmt"
-	"github.com/ethereum/go-ethereum/accounts/abi/bind"
-	log "github.com/sirupsen/logrus"
-	"google.golang.org/protobuf/encoding/protojson"
 	"math/big"
 	"strconv"
 	"time"
+
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
+	log "github.com/sirupsen/logrus"
+	"google.golang.org/protobuf/encoding/protojson"
 )
 
 var (
@@ -70,10 +71,6 @@ func UpdateSubmissionCounts(batchSubmissions []*ipfs.BatchSubmission, day *big.I
 	for _, batchSubmission := range batchSubmissions {
 		for _, sub := range batchSubmission.Batch.Submissions {
 			submission := pkgs.SnapshotSubmission{}
-			var ok bool
-
-			newCount := big.NewInt(0)
-
 			err := protojson.Unmarshal([]byte(sub), &submission)
 			if err != nil {
 				clients.SendFailureNotification("Submission unmarshalling", fmt.Sprintf("failed to unmarshal submission %s: %s", sub, err.Error()), time.Now().String(), "High")
@@ -81,32 +78,26 @@ func UpdateSubmissionCounts(batchSubmissions []*ipfs.BatchSubmission, day *big.I
 				continue
 			}
 			slotId := new(big.Int).SetUint64(submission.Request.SlotId)
-			count, err := redis.Get(context.Background(), redis.SlotSubmissionKey(slotId.String(), day.String()))
-			if err == nil && count != "" {
-				newCount, ok = new(big.Int).SetString(count, 10)
-				if !ok {
-					clients.SendFailureNotification("DailyTaskHandler", fmt.Sprintf("Incorrect bigInt stored in redis:  %s", count), time.Now().String(), "High")
-					log.Errorln("Incorrect bigInt stored in redis: ", count)
-					continue
-				}
-				newCount = new(big.Int).Add(newCount, big.NewInt(1))
-
-				if newCount.Cmp(DailySnapshotQuota) == 0 {
+			count, err := redis.Incr(context.Background(), redis.SlotSubmissionKey(slotId.String(), day.String()))
+			countBigInt := big.NewInt(count)
+			if err == nil && count != 0 {
+				if countBigInt.Cmp(DailySnapshotQuota) == 0 {
 					// Calculate and store rewards
 					go CalculateAndStoreRewards(new(big.Int).Set(day), new(big.Int).Set(slotId))
 				}
+				err = redis.Expire(context.Background(), redis.SlotSubmissionKey(slotId.String(), day.String()), pkgs.Day*2)
+				if err != nil {
+					log.Errorln("Error setting expiry for slot submission in redis: ", err)
+				}
+				err = redis.AddToSet(context.Background(), redis.SlotSubmissionSetByDay(day.String()), redis.SlotSubmissionKey(slotId.String(), day.String()))
+				if err != nil {
+					clients.SendFailureNotification("UpdateSubmissionCounts", err.Error(), time.Now().String(), "High")
+					log.Errorln("Error updating slot submission in redis: ", err)
+				}
 			} else {
-				newCount = big.NewInt(1)
-			}
-			err = redis.AddToSet(context.Background(), redis.SlotSubmissionSetByDay(day.String()), redis.SlotSubmissionKey(slotId.String(), day.String()))
-			if err != nil {
-				clients.SendFailureNotification("UpdateSubmissionCounts", err.Error(), time.Now().String(), "High")
-				log.Errorln("Error updating slot submission in redis: ", err)
-			}
-
-			err = redis.Set(context.Background(), redis.SlotSubmissionKey(slotId.String(), day.String()), newCount.String(), pkgs.Day*3)
-			if err != nil {
-				log.Errorln("Error updating slot submission in redis: ", err)
+				// send notification
+				clients.SendFailureNotification("UpdateSubmissionCounts", fmt.Sprintf("Unable to increment submission count for slot %s on day %s: %s", slotId.String(), day.String(), err.Error()), time.Now().String(), "High")
+				log.Errorln("Unable to increment submission count for slot: ", err)
 			}
 		}
 	}
