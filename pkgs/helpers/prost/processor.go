@@ -8,14 +8,15 @@ import (
 	"collector/pkgs/helpers/redis"
 	"context"
 	"fmt"
+	"math/big"
+	"strconv"
+	"time"
+
 	"github.com/cenkalti/backoff/v4"
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/rpc"
 	log "github.com/sirupsen/logrus"
-	"math/big"
-	"strconv"
-	"time"
 )
 
 func ProcessEvents(block *types.Block, contractABI abi.ABI) {
@@ -99,6 +100,13 @@ func processEpoch(epochId, submissionLimit *big.Int, begin *types.Block) {
 		}
 		triggerCollectionFlow(epochId, headers, prev)
 		UpdateRewards(prev)
+		// set expiry of 24 hours for day submissions set and slot ID submissions by day keys within that set
+		prevDaySlotSubmissionsKeySet := redis.SlotSubmissionSetByDay(prev.String())
+		err = redis.Expire(context.Background(), prevDaySlotSubmissionsKeySet, pkgs.Day*1)
+		if err != nil {
+			clients.SendFailureNotification("processEpoch", fmt.Sprintf("Unable to set expiry for %s in redis: %s", prevDaySlotSubmissionsKeySet, err.Error()), time.Now().String(), "Medium")
+			log.Errorf("Unable to set expiry for %s in redis: %s", prevDaySlotSubmissionsKeySet, err.Error())
+		}
 	} else {
 		triggerCollectionFlow(epochId, headers, Day)
 	}

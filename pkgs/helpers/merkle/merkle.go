@@ -9,15 +9,16 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/sergerad/incremental-merkle-tree/imt"
-	log "github.com/sirupsen/logrus"
-	"google.golang.org/protobuf/encoding/protojson"
 	"math/big"
 	"sort"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/sergerad/incremental-merkle-tree/imt"
+	log "github.com/sirupsen/logrus"
+	"google.golang.org/protobuf/encoding/protojson"
 )
 
 var BatchId int
@@ -71,7 +72,7 @@ func BuildBatchSubmissions(epochId *big.Int, headers []string) ([]*ipfs.BatchSub
 		log.Errorln("Batch finalization error: ", err.Error())
 	}
 
-	log.Debugf("Finalized batch submissions for epoch %d: %s\n", epochId, batchSubmissions)
+	log.Debugf("Finalized batch submissions for epoch %d: %v\n", epochId, batchSubmissions)
 
 	return batchSubmissions, err
 }
