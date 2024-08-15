@@ -15,6 +15,7 @@ import (
 func main() {
 	utils.InitLogger()
 	config.LoadConfig()
+	redis.RedisClient = redis.NewRedisClient()
 
 	clients.InitializeReportingClient(config.SettingsObj.SlackReportingUrl, time.Duration(config.SettingsObj.HttpTimeout)*time.Second)
 	clients.InitializeRewardsBackendClient(config.SettingsObj.RewardsBackendUrl, time.Duration(config.SettingsObj.HttpTimeout)*time.Second)
@@ -23,7 +24,6 @@ func main() {
 
 	prost.ConfigureClient()
 	prost.ConfigureContractInstance()
-	redis.RedisClient = redis.NewRedisClient()
 	ipfs.ConnectIPFSNode()
 
 	prost.PopulateStateVars()
