@@ -180,12 +180,12 @@ func (tm *TxManager) CommitSubmissionBatch(account *Account, batchSubmission *ip
 func (tm *TxManager) BatchUpdateRewards(day *big.Int) []string {
 	slotIds := []*big.Int{}
 	submissions := []*big.Int{}
-	batchSize := config.SettingsObj.BatchSize
 	submittedSlots := []string{}
 
-	account := tm.accountHandler.GetFreeAccount(true)
-	defer tm.accountHandler.ReleaseAccount(account)
+	var wg sync.WaitGroup
+	accounts := []*Account{}
 
+	// Fetch all valid slot-submission pairs from redis
 	slotSubmissionCounts := redis.GetSetKeys(context.Background(), redis.SlotSubmissionSetByDay(day.String()))
 	for _, key := range slotSubmissionCounts {
 		val, err := redis.Get(context.Background(), key)
@@ -220,21 +220,92 @@ func (tm *TxManager) BatchUpdateRewards(day *big.Int) []string {
 			continue
 		}
 
-		submittedSlots = append(submittedSlots, slot.String())
 		slotIds = append(slotIds, slot)
 		submissions = append(submissions, counts)
-		if len(slotIds) == batchSize {
-			txManager.UpdateRewards(account, slotIds, submissions, day)
-			slotIds = []*big.Int{}
-			submissions = []*big.Int{}
-			account.UpdateAuth(1)
+		submittedSlots = append(submittedSlots, slot.String())
+	}
+
+	slotsPerTransaction := config.SettingsObj.BatchSize
+
+	// Send max slots = BatchSize per update transaction
+	requiredTransactions := len(slotIds) / slotsPerTransaction
+
+	var requiredAccounts int
+
+	batchDivision := requiredTransactions / config.SettingsObj.PermissibleBatchesPerAccount
+	if extra := requiredTransactions % config.SettingsObj.PermissibleBatchesPerAccount; extra == 0 {
+		requiredAccounts = batchDivision
+	} else {
+		requiredAccounts = batchDivision + 1
+	}
+
+	// try to get required free accounts
+	for i := 0; i < requiredAccounts; i++ {
+		if account := tm.accountHandler.GetFreeAccount(false); account != nil {
+			accounts = append(accounts, account)
 		}
 	}
 
-	if len(slotIds) > 0 {
-		txManager.UpdateRewards(account, slotIds, submissions, day)
-		account.UpdateAuth(1)
+	if len(accounts) == 0 {
+		log.Warnln("All accounts are occupied, waiting for one account and proceeding with batch submissions")
+		accounts = append(accounts, tm.accountHandler.GetFreeAccount(true))
 	}
+
+	// divide evenly among available accounts
+	transactionsPerAccount := requiredTransactions / len(accounts)
+
+	slotsPerAccount := transactionsPerAccount * slotsPerTransaction
+
+	var begin, end int
+	// send asynchronous batch submissions
+	for i := 0; i < len(accounts); i++ {
+		account := accounts[i]
+
+		begin = i * slotsPerAccount
+		if i == len(accounts)-1 {
+			end = len(slotIds)
+		} else {
+			end = (i + 1) * slotsPerAccount
+		}
+
+		accountSlotIds := slotIds[begin:end]
+		accountSubmissions := submissions[begin:end]
+
+		wg.Add(1)
+
+		// Process the slots asynchronously
+		go func(acc *Account, slotIds, submissions []*big.Int, day *big.Int) {
+			defer wg.Done()
+
+			var start, finish int
+			var steps int
+
+			if len(slotIds)%slotsPerTransaction == 0 {
+				steps = len(slotIds) / slotsPerTransaction
+			} else {
+				steps = len(slotIds)/slotsPerTransaction + 1
+			}
+
+			// Update slot rewards
+			for i := 0; i < steps; i++ {
+				start = i * slotsPerTransaction
+				if i == steps-1 {
+					finish = len(slotIds)
+				} else {
+					finish = (i + 1) * slotsPerTransaction
+				}
+				tm.UpdateRewards(acc, slotIds[start:finish], submissions[start:finish], day)
+				acc.UpdateAuth(1)
+			}
+
+			// Release the account after processing the slots
+			tm.accountHandler.ReleaseAccount(acc)
+		}(account, accountSlotIds, accountSubmissions, day)
+	}
+
+	// Wait for all goroutines to complete
+	wg.Wait()
+
 	return submittedSlots
 }
 
@@ -288,19 +359,8 @@ func (tm *TxManager) UpdateRewards(account *Account, slotIds, submissions []*big
 	}
 
 	dayLogKey := redis.TriggeredProcessLog(pkgs.UpdateRewards, day.String())
-	existingLog, err := redis.Get(context.Background(), dayLogKey)
-	logEntries := make(map[string]interface{})
-	if err == nil && existingLog != "" {
-		err = json.Unmarshal([]byte(existingLog), &logEntries)
-		if err != nil {
-			clients.SendFailureNotification("UpdateRewardsProcessLog", fmt.Sprintf("Error unmarshalling existing log entries: %v", err), time.Now().String(), "High")
-			log.Errorf("Error unmarshalling existing log entries: %v", err)
-		}
-	}
 
-	logEntries[tx.Hash().Hex()] = logEntry
-
-	if err = redis.SetProcessLog(context.Background(), redis.TriggeredProcessLog(pkgs.UpdateRewards, day.String()), logEntries, 4*time.Hour); err != nil {
+	if err = redis.UpdateProcessLogTable(context.Background(), dayLogKey, tx.Hash().Hex(), logEntry); err != nil {
 		clients.SendFailureNotification("UpdateRewards", err.Error(), time.Now().String(), "High")
 		log.Errorf("UpdateRewards process log error: %s ", err.Error())
 	}

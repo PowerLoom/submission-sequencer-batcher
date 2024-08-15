@@ -6,13 +6,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/go-redis/redis/v8"
-	log "github.com/sirupsen/logrus"
 	"math/big"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/go-redis/redis/v8"
+	log "github.com/sirupsen/logrus"
 )
 
 var RedisClient *redis.Client
@@ -55,6 +56,10 @@ func Delete(ctx context.Context, set string) error {
 	return RedisClient.Del(ctx, set).Err()
 }
 
+func Expire(ctx context.Context, key string, expiration time.Duration) error {
+	return RedisClient.Expire(ctx, key, expiration).Err()
+}
+
 func SetSubmission(ctx context.Context, key string, value string, set string, expiration time.Duration) error {
 	if err := RedisClient.SAdd(ctx, set, key).Err(); err != nil {
 		return err
@@ -81,6 +86,14 @@ func Set(ctx context.Context, key, value string, expiration time.Duration) error
 	return RedisClient.Set(ctx, key, value, expiration).Err()
 }
 
+func Incr(ctx context.Context, key string) (int64, error) {
+    result, err := RedisClient.Incr(ctx, key).Result()
+    if err != nil {
+        return 0, err
+    }
+    return result, nil
+}
+
 // Save log to Redis
 func SetProcessLog(ctx context.Context, key string, logEntry map[string]interface{}, exp time.Duration) error {
 	data, err := json.Marshal(logEntry)
@@ -89,6 +102,20 @@ func SetProcessLog(ctx context.Context, key string, logEntry map[string]interfac
 	}
 
 	err = RedisClient.Set(ctx, key, data, exp).Err()
+	if err != nil {
+		return fmt.Errorf("failed to set log entry in Redis: %w", err)
+	}
+
+	return nil
+}
+
+func UpdateProcessLogTable(ctx context.Context, table, key string, logEntry map[string]interface{}) error {
+	data, err := json.Marshal(logEntry)
+	if err != nil {
+		return fmt.Errorf("failed to marshal log entry: %w", err)
+	}
+
+	err = RedisClient.HSet(ctx, table, key, data).Err()
 	if err != nil {
 		return fmt.Errorf("failed to set log entry in Redis: %w", err)
 	}
