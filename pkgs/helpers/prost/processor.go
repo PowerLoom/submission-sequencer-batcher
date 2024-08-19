@@ -102,7 +102,7 @@ func processEpoch(epochId, submissionLimit *big.Int, begin *types.Block) {
 		UpdateRewards(prev)
 		// set expiry of 24 hours for day submissions set and slot ID submissions by day keys within that set
 		prevDaySlotSubmissionsKeySet := redis.SlotSubmissionSetByDay(prev.String())
-		err = redis.Expire(context.Background(), prevDaySlotSubmissionsKeySet, pkgs.Day*1)
+		err = redis.Expire(context.Background(), prevDaySlotSubmissionsKeySet, pkgs.Day*7)
 		if err != nil {
 			clients.SendFailureNotification("processEpoch", fmt.Sprintf("Unable to set expiry for %s in redis: %s", prevDaySlotSubmissionsKeySet, err.Error()), time.Now().String(), "Medium")
 			log.Errorf("Unable to set expiry for %s in redis: %s", prevDaySlotSubmissionsKeySet, err.Error())
