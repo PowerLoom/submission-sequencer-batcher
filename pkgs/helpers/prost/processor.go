@@ -27,7 +27,7 @@ func ProcessEvents(block *types.Block, contractABI abi.ABI) {
 		return err
 	}
 
-	if err = backoff.Retry(operation, backoff.WithMaxRetries(backoff.NewConstantBackOff(100*time.Millisecond), 3)); err != nil {
+	if err = backoff.Retry(operation, backoff.WithMaxRetries(backoff.NewConstantBackOff(200*time.Millisecond), 3)); err != nil {
 		log.Errorln("Error fetching block receipts: ", err.Error())
 		clients.SendFailureNotification("ProcessEvents", fmt.Sprintf("Error fetching block receipts: %s", err.Error()), time.Now().String(), "High")
 		return
