@@ -36,14 +36,11 @@ func ProcessEvents(block *types.Block, contractABI abi.ABI) {
 	}
 
 	if err = backoff.Retry(operation, backoff.WithMaxRetries(backoff.NewConstantBackOff(200*time.Millisecond), 3)); err != nil {
-		log.Errorln("Error fetching block receipts: ", err.Error())
-		clients.SendFailureNotification("ProcessEvents", fmt.Sprintf("Error fetching block receipts: %s", err.Error()), time.Now().String(), "High")
+		log.Errorln("Error fetching logs: ", err.Error())
+		clients.SendFailureNotification("ProcessEvents", fmt.Sprintf("Error fetching logs: %s", err.Error()), time.Now().String(), "High")
 		return
 	}
 	for _, vLog := range logs {
-		if vLog.Address.Hex() != config.SettingsObj.ContractAddress {
-			continue
-		}
 		switch vLog.Topics[0].Hex() {
 		case contractABI.Events["EpochReleased"].ID.Hex():
 			event, err := Instance.ParseEpochReleased(vLog)
