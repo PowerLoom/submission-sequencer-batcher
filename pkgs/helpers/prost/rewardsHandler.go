@@ -85,7 +85,7 @@ func UpdateSubmissionCounts(batchSubmissions []*ipfs.BatchSubmission, day *big.I
 					// Calculate and store rewards
 					go CalculateAndStoreRewards(new(big.Int).Set(day), new(big.Int).Set(slotId))
 				}
-				err = redis.Expire(context.Background(), redis.SlotSubmissionKey(slotId.String(), day.String()), pkgs.Day*2)
+				err = redis.Expire(context.Background(), redis.SlotSubmissionKey(slotId.String(), day.String()), pkgs.Day*7)
 				if err != nil {
 					log.Errorln("Error setting expiry for slot submission in redis: ", err)
 				}
