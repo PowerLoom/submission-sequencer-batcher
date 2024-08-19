@@ -25,6 +25,7 @@ import (
 var txManager *TxManager
 
 const defaultGasLimit = uint64(20000000) // in units
+var backoffInstance = backoff.NewExponentialBackOff()
 
 type TxManager struct {
 	accountHandler *AccountHandler
@@ -32,6 +33,15 @@ type TxManager struct {
 
 func InitializeTxManager() {
 	txManager = &TxManager{accountHandler: NewAccountHandler()}
+	initializeBackoffInstance()
+}
+
+func initializeBackoffInstance() {
+	backoffInstance.InitialInterval = 1 * time.Second
+	backoffInstance.RandomizationFactor = 0.2
+	backoffInstance.Multiplier = 1.2
+	backoffInstance.MaxInterval = 30 * time.Second
+	backoffInstance.MaxElapsedTime = 5 * time.Minute
 }
 
 func (tm *TxManager) EndBatchSubmissionsForEpoch(epochId *big.Int) {
@@ -47,7 +57,7 @@ func (tm *TxManager) EndBatchSubmissionsForEpoch(epochId *big.Int) {
 		}
 		return nil
 	}
-	if err = backoff.Retry(operation, backoff.WithMaxRetries(backoff.NewExponentialBackOff(), 7)); err != nil {
+	if err = backoff.Retry(operation, backoff.WithMaxRetries(backoffInstance, 7)); err != nil {
 		clients.SendFailureNotification("EndBatchSubmissionsForEpoch", fmt.Sprintf("Unable to EndBatchSubmissionsForEpoch %s: %s", epochId.String(), err.Error()), time.Now().String(), "High")
 		log.Debugf("Batch submission completion signal for epoch %s failed after max retries: %s", epochId.String(), err.Error())
 		return
@@ -65,7 +75,7 @@ func (tm *TxManager) GetTxReceipt(txHash common.Hash, identifier string) (*types
 			log.Errorf("Failed to increment txreceipt count in Redis: %s", err.Error())
 		}
 		return err
-	}, backoff.WithMaxRetries(backoff.NewExponentialBackOff(), 7))
+	}, backoff.WithMaxRetries(backoffInstance, 7))
 
 	return receipt, err
 }
@@ -144,7 +154,7 @@ func (tm *TxManager) CommitSubmissionBatch(account *Account, batchSubmission *ip
 		}
 		return nil
 	}
-	if err = backoff.Retry(operation, backoff.WithMaxRetries(backoff.NewExponentialBackOff(), 7)); err != nil {
+	if err = backoff.Retry(operation, backoff.WithMaxRetries(backoffInstance, 7)); err != nil {
 		clients.SendFailureNotification("CommitSubmissionBatch", fmt.Sprintf("Batch %s submission for epoch %s failed after max retries: %s", batchSubmission.Batch.ID.String(), batchSubmission.EpochId.String(), err.Error()), time.Now().String(), "High")
 		log.Debugf("Batch %s submission for epoch %s failed after max retries: ", batchSubmission.Batch.ID.String(), batchSubmission.EpochId.String())
 		return
@@ -339,7 +349,7 @@ func (tm *TxManager) UpdateRewards(account *Account, slotIds, submissions []*big
 		}
 		return nil
 	}
-	if err = backoff.Retry(operation, backoff.WithMaxRetries(backoff.NewExponentialBackOff(), 5)); err != nil {
+	if err = backoff.Retry(operation, backoff.WithMaxRetries(backoffInstance, 5)); err != nil {
 		clients.SendFailureNotification("UpdateRewards", fmt.Sprintf("Reward updates for day %s failed: %s", day.String(), err.Error()), time.Now().String(), "High")
 		log.Debugf("Reward updates for day %s failed: ", day.String())
 		return
@@ -421,7 +431,7 @@ func (tm *TxManager) EnsureRewardUpdateSuccess(day *big.Int) {
 					}
 					return nil
 				}
-				if err = backoff.Retry(operation, backoff.WithMaxRetries(backoff.NewExponentialBackOff(), 5)); err != nil {
+				if err = backoff.Retry(operation, backoff.WithMaxRetries(backoffInstance, 5)); err != nil {
 					clients.SendFailureNotification("EnsureRewardUpdateSuccess", fmt.Sprintf("Resubmitted reward updates for day %s slots %s failed: %s", day.String(), slotIdStrings, err.Error()), time.Now().String(), "High")
 					log.Debugf("Resubmitted reward updates for day %s failed: ", day.String())
 					return
@@ -536,7 +546,7 @@ func (tm *TxManager) EnsureBatchSubmissionSuccess(epochID *big.Int) {
 						}
 						return nil
 					}
-					if err = backoff.Retry(operation, backoff.WithMaxRetries(backoff.NewExponentialBackOff(), 5)); err != nil {
+					if err = backoff.Retry(operation, backoff.WithMaxRetries(backoffInstance, 5)); err != nil {
 						clients.SendFailureNotification("EnsureBatchSubmissionSuccess", fmt.Sprintf("Resubmission for batch %s failed: %s", batchSubmission.Batch.ID.String(), err.Error()), time.Now().String(), "High")
 						log.Debugf("Resubmission for batch %s failed: ", batchSubmission.Batch.ID.String())
 						return

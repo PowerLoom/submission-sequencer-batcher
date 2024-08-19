@@ -54,7 +54,7 @@ func UpdateRewards(day *big.Int) {
 	if count, err := redis.Get(context.Background(), redis.TransactionReceiptCountByEvent(day.String())); count != "" {
 		log.Debugf("Transaction receipt fetches for day %s: %s", day.String(), count)
 		n, _ := strconv.Atoi(count)
-		if n > (len(slots)/config.SettingsObj.BatchSize)*3 { // giving upto 3 retries per txn
+		if n > (len(slots)/config.SettingsObj.BatchSize)*3 { // giving up to 3 retries per txn
 			clients.SendFailureNotification("EnsureRewardUpdateSuccess", fmt.Sprintf("Too many transaction receipts fetched for day %s: %s", day.String(), count), time.Now().String(), "Medium")
 			log.Debugf("Too many transaction receipts fetched for day %s: %s", day.String(), count)
 		}
