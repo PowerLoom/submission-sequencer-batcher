@@ -27,7 +27,7 @@ func ProcessEvents(block *types.Block, contractABI abi.ABI) {
 	hash := block.Hash()
 	filterQuery := ethereum.FilterQuery{
 		BlockHash: &hash,
-		Addresses: []common.Address{common.HexToAddress(config.SettingsObj.DataMarketAddress)},
+		Addresses: []common.Address{common.HexToAddress(config.SettingsObj.ContractAddress)},
 	}
 
 	operation := func() error {
@@ -40,6 +40,7 @@ func ProcessEvents(block *types.Block, contractABI abi.ABI) {
 		clients.SendFailureNotification("ProcessEvents", fmt.Sprintf("Error fetching logs: %s", err.Error()), time.Now().String(), "High")
 		return
 	}
+
 	for _, vLog := range logs {
 		switch vLog.Topics[0].Hex() {
 		case contractABI.Events["EpochReleased"].ID.Hex():
