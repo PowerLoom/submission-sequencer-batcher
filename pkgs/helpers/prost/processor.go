@@ -92,7 +92,7 @@ func processEpoch(epochId, submissionLimit *big.Int, begin *types.Block) {
 		log.Errorln("TriggerCollectionFlow process log error: ", err.Error())
 	}
 
-	updatedDay := new(big.Int).SetUint64(((epochId.Uint64() - 1) / EpochsPerDay) + 1 + pkgs.DayBuffer)
+	updatedDay := new(big.Int).SetUint64(((epochId.Uint64() - 1) / EpochsPerDay) + 1 + pkgs.DayBuffer)  // 2828 / 10 = 282 + 1 == 283
 	if updatedDay.Cmp(Day) > 0 {
 		prev := new(big.Int).Set(Day)
 		Day = new(big.Int).Set(updatedDay)
@@ -121,6 +121,7 @@ func triggerCollectionFlow(epochID *big.Int, headers []string, day *big.Int) {
 	if batchSubmissions, err := merkle.BuildBatchSubmissions(epochID, headers); err != nil {
 		log.Debugln("Error building batched merkle tree: ", err)
 	} else {
+		UpdateSubmissionCounts(batchSubmissions, day)
 		txManager.CommitSubmissionBatches(batchSubmissions)
 		//log.Debugf("Merkle tree built, resetting db for epoch: %d", epochID)
 		// remove submissions as we no longer need them
@@ -140,7 +141,7 @@ func triggerCollectionFlow(epochID *big.Int, headers []string, day *big.Int) {
 			log.Errorln("Redis error: ", err.Error())
 		}
 		redis.Delete(context.Background(), redis.TransactionReceiptCountByEvent(epochID.String()))
-		UpdateSubmissionCounts(batchSubmissions, day)
+		
 		txManager.EndBatchSubmissionsForEpoch(epochID)
 	}
 }
