@@ -87,6 +87,31 @@ func processEpoch(epochId, submissionLimit *big.Int, begin *types.Block) {
 		log.Errorln("TriggerCollectionFlow process log error: ", err.Error())
 	}
 
+	go func(epochId *big.Int, headers []string, Day *big.Int) {
+		epochSizeString, err := redis.Get(context.Background(), redis.EPOCH_SIZE())
+		if err != nil {
+			log.Fatalf("Error fetching EPOCH_SIZE from redis: %s", err.Error())
+		}
+
+		sourceChainBlockTimeString, err := redis.Get(context.Background(), redis.SOURCE_CHAIN_BLOCK_TIME())
+		if err != nil {
+			log.Fatalf("Error fetching SOURCE_CHAIN_BLOCK_TIME from redis: %s", err.Error())
+		}
+
+		epochSize, err := strconv.Atoi(epochSizeString)
+		if err != nil {
+			log.Fatalf("Error converting EPOCH_SIZE to int: %s", err.Error())
+		}
+
+		sourceChainBlockTime, err := strconv.Atoi(sourceChainBlockTimeString)
+		if err != nil {
+			log.Fatalf("Error converting SOURCE_CHAIN_BLOCK_TIME to int: %s", err.Error())
+		}
+
+		time.Sleep(time.Duration(epochSize*sourceChainBlockTime) * time.Millisecond)
+		triggerCollectionFlow(epochId, headers, Day)
+	}(epochId, headers, Day)
+
 	updatedDay := new(big.Int).SetUint64(((epochId.Uint64() - 1) / EpochsPerDay) + 1 + pkgs.DayBuffer)
 	if updatedDay.Cmp(Day) > 0 {
 		prev := new(big.Int).Set(Day)
@@ -97,10 +122,7 @@ func processEpoch(epochId, submissionLimit *big.Int, begin *types.Block) {
 			clients.SendFailureNotification("processEpoch", fmt.Sprintf("Unable to update day %s in redis: %s", Day.String(), err.Error()), time.Now().String(), "Medium")
 			log.Errorf("Unable to update day %s in redis: %s", Day.String(), err.Error())
 		}
-		triggerCollectionFlow(epochId, headers, prev)
 		UpdateRewards(prev)
-	} else {
-		triggerCollectionFlow(epochId, headers, Day)
 	}
 }
 
