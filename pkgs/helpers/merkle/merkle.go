@@ -111,11 +111,11 @@ func finalizeBatches(batchedKeys [][]string, epochId *big.Int, tree *imt.Increme
 
 				log.Debugln(fmt.Sprintf("Processing key %s and value %s", key, val))
 
-				if len(val) == 0 {
-					clients.SendFailureNotification("finalizeBatches", fmt.Sprintf("Value has expired for key: %s", key), time.Now().String(), "High")
-					log.Errorln("Value has expired for key:  ", key)
-					return
-				}
+			if len(val) == 0 {
+				clients.SendFailureNotification("finalizeBatches", fmt.Sprintf("Value has expired for key, not being counted in batch: %s", key), time.Now().String(), "High")
+				log.Errorln("Value has expired for key:  ", key)
+				continue
+			}
 
 				parts := strings.Split(key, ".")
 				if len(parts) != 3 {
