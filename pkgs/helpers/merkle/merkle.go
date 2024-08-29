@@ -100,9 +100,9 @@ func finalizeBatches(batchedKeys [][]string, epochId *big.Int, tree *imt.Increme
 			log.Debugln(fmt.Sprintf("Processing key %s and value %s", key, val))
 
 			if len(val) == 0 {
-				clients.SendFailureNotification("finalizeBatches", fmt.Sprintf("Value has expired for key: %s", key), time.Now().String(), "High")
+				clients.SendFailureNotification("finalizeBatches", fmt.Sprintf("Value has expired for key, not being counted in batch: %s", key), time.Now().String(), "High")
 				log.Errorln("Value has expired for key:  ", key)
-				return nil, errors.New(fmt.Sprintf("Value has expired for key: %s", key))
+				continue
 			}
 
 			parts := strings.Split(key, ".")
@@ -150,7 +150,7 @@ func finalizeBatches(batchedKeys [][]string, epochId *big.Int, tree *imt.Increme
 		}
 
 		var keys []string
-		for pid, _ := range projectMostFrequent {
+		for pid := range projectMostFrequent {
 			keys = append(keys, pid)
 		}
 
@@ -174,8 +174,6 @@ func finalizeBatches(batchedKeys [][]string, epochId *big.Int, tree *imt.Increme
 		batchSubmissions = append(batchSubmissions, batchSubmission)
 		log.Debugf("CID: %s Batch: %d", batchSubmission.Cid, BatchId)
 		BatchId++
-		allData = []string{}
-		allIds = []string{}
 		projectMostFrequent = make(map[string]string)
 		projectValueFrequencies = make(map[string]map[string]int)
 	}
