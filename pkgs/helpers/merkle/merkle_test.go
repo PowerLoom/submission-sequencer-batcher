@@ -25,9 +25,6 @@ import (
 	"time"
 )
 
-// TODO: Add more tests and run IPFS and Redis in docker containers for testing
-// TODO: Alternatively, mock the IPFS and use mini-redis for testing
-
 type SubmissionDetails struct {
 	day          *big.Int
 	submissionId uuid.UUID
@@ -132,7 +129,7 @@ func TestBuildBatchSubmissions(t *testing.T) {
 	ipfs.ConnectIPFSNode()
 
 	var cids []string
-	var num = 1200
+	var num = 6000
 
 	rand.Seed(time.Now().UnixNano())
 	// Generate 10 random CIDs

@@ -17,6 +17,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -40,6 +41,7 @@ func GetRootHash(tree *imt.IncrementalMerkleTree) string {
 
 func BuildBatchSubmissions(epochId *big.Int, headers []string) ([]*ipfs.BatchSubmission, error) {
 	keys, err := redis.GetValidSubmissionKeys(context.Background(), epochId, headers)
+	log.Debugln("Fetched keys: ", len(keys))
 	if err != nil {
 		return nil, err
 	}
@@ -71,113 +73,122 @@ func BuildBatchSubmissions(epochId *big.Int, headers []string) ([]*ipfs.BatchSub
 		log.Errorln("Batch finalization error: ", err.Error())
 	}
 
-	log.Debugf("Finalized batch submissions for epoch %d: %s\n", epochId, batchSubmissions)
+	log.Debugf("Finalized batch submissions for epoch %d: \n", epochId)
 
 	return batchSubmissions, err
 }
 
 func finalizeBatches(batchedKeys [][]string, epochId *big.Int, tree *imt.IncrementalMerkleTree) ([]*ipfs.BatchSubmission, error) {
-	projectValueFrequencies := make(map[string]map[string]int)
-	projectMostFrequent := make(map[string]string)
+	//projectValueFrequencies := make(map[string]map[string]int)
+	//projectMostFrequent := make(map[string]string)
 	batchSubmissions := make([]*ipfs.BatchSubmission, 0)
 	//TODO: Don't just return the most frequent, if it is not 51% consensus, trigger a signal for watchers
 
-	// Iterate through each batch
+	var wg sync.WaitGroup
+	var mu sync.Mutex
+
 	for _, batch := range batchedKeys {
-		log.Debugln("Processing batch: ", batch)
-		allIds := []string{}
-		allData := []string{}
-		for _, key := range batch {
-			val, err := redis.Get(context.Background(), key)
+		wg.Add(1)
 
-			if err != nil {
-				clients.SendFailureNotification("finalizeBatches", fmt.Sprintf("Error fetching data from redis: %s", err.Error()), time.Now().String(), "High")
-				log.Errorln("Error fetching data from redis: ", err.Error())
-				continue
-			}
+		go func(batch []string) {
+			defer wg.Done()
 
-			log.Debugln(fmt.Sprintf("Processing key %s and value %s", key, val))
+			log.Debugln("Processing batch: ", batch)
+			allIds := []string{}
+			allData := []string{}
+			localProjectMostFrequent := make(map[string]string)
+			localProjectValueFrequencies := make(map[string]map[string]int)
 
-			if len(val) == 0 {
-				clients.SendFailureNotification("finalizeBatches", fmt.Sprintf("Value has expired for key: %s", key), time.Now().String(), "High")
-				log.Errorln("Value has expired for key:  ", key)
-				return nil, errors.New(fmt.Sprintf("Value has expired for key: %s", key))
-			}
+			for _, key := range batch {
+				val, err := redis.Get(context.Background(), key)
 
-			parts := strings.Split(key, ".")
-			if len(parts) != 3 {
-				clients.SendFailureNotification("finalizeBatches", fmt.Sprintf("Key should have three parts, invalid key: %s", key), time.Now().String(), "High")
-				log.Errorln("Key should have three parts, invalid key: ", key)
-				continue // skip malformed keys
-			}
-			projectId := parts[1]
-
-			// Initialize map if not already
-			if projectValueFrequencies[projectId] == nil {
-				projectValueFrequencies[projectId] = make(map[string]int)
-			}
-
-			idSubPair := strings.Split(val, ".")
-			if len(idSubPair) != 2 {
-				clients.SendFailureNotification("finalizeBatches", fmt.Sprintf("Value should have two parts, invalid value: %s", val), time.Now().String(), "High")
-				log.Errorln("Value should have two parts, invalid value: ", val)
-				continue // skip malformed keys
-			}
-
-			subHolder := pkgs.SnapshotSubmission{}
-			//value := utils.ExtractField(idSubPair[1], "snapshotCid")
-			err = protojson.Unmarshal([]byte(idSubPair[1]), &subHolder)
-			if err != nil {
-				clients.SendFailureNotification("finalizeBatches", fmt.Sprintf("Unmarshalling %s error: %s", idSubPair[1], err.Error()), time.Now().String(), "High")
-				log.Errorln("Unable to unmarshal submission: ", err)
-				continue
-			}
-
-			value := subHolder.Request.SnapshotCid
-			// Track frequency of each value per project
-			projectValueFrequencies[projectId][value] += 1
-
-			// Determine most frequent value so far
-			if count, exists := projectValueFrequencies[projectId][value]; exists {
-				if count > projectValueFrequencies[projectId][projectMostFrequent[projectId]] {
-					projectMostFrequent[projectId] = value
+				if err != nil {
+					clients.SendFailureNotification("finalizeBatches", fmt.Sprintf("Error fetching data from redis: %s", err.Error()), time.Now().String(), "High")
+					log.Errorln("Error fetching data from redis: ", err.Error())
+					continue
 				}
+
+				log.Debugln(fmt.Sprintf("Processing key %s and value %s", key, val))
+
+				if len(val) == 0 {
+					clients.SendFailureNotification("finalizeBatches", fmt.Sprintf("Value has expired for key: %s", key), time.Now().String(), "High")
+					log.Errorln("Value has expired for key:  ", key)
+					return
+				}
+
+				parts := strings.Split(key, ".")
+				if len(parts) != 3 {
+					clients.SendFailureNotification("finalizeBatches", fmt.Sprintf("Key should have three parts, invalid key: %s", key), time.Now().String(), "High")
+					log.Errorln("Key should have three parts, invalid key: ", key)
+					continue // skip malformed keys
+				}
+				projectId := parts[1]
+
+				if localProjectValueFrequencies[projectId] == nil {
+					localProjectValueFrequencies[projectId] = make(map[string]int)
+				}
+
+				idSubPair := strings.Split(val, ".")
+				if len(idSubPair) != 2 {
+					clients.SendFailureNotification("finalizeBatches", fmt.Sprintf("Value should have two parts, invalid value: %s", val), time.Now().String(), "High")
+					log.Errorln("Value should have two parts, invalid value: ", val)
+					continue // skip malformed keys
+				}
+
+				subHolder := pkgs.SnapshotSubmission{}
+				err = protojson.Unmarshal([]byte(idSubPair[1]), &subHolder)
+				if err != nil {
+					clients.SendFailureNotification("finalizeBatches", fmt.Sprintf("Unmarshalling %s error: %s", idSubPair[1], err.Error()), time.Now().String(), "High")
+					log.Errorln("Unable to unmarshal submission: ", err)
+					continue
+				}
+
+				value := subHolder.Request.SnapshotCid
+
+				localProjectValueFrequencies[projectId][value] += 1
+
+				if count, exists := localProjectValueFrequencies[projectId][value]; exists {
+					if count > localProjectValueFrequencies[projectId][localProjectMostFrequent[projectId]] {
+						localProjectMostFrequent[projectId] = value
+					}
+				}
+
+				allData = append(allData, idSubPair[1])
+				allIds = append(allIds, idSubPair[0])
 			}
 
-			allData = append(allData, idSubPair[1])
-			allIds = append(allIds, idSubPair[0])
-		}
+			var keys []string
+			for pid := range localProjectMostFrequent {
+				keys = append(keys, pid)
+			}
 
-		var keys []string
-		for pid, _ := range projectMostFrequent {
-			keys = append(keys, pid)
-		}
+			pids := []string{}
+			cids := []string{}
+			sort.Strings(keys)
+			for _, pid := range keys {
+				pids = append(pids, pid)
+				cids = append(cids, localProjectMostFrequent[pid])
+			}
 
-		pids := []string{}
-		cids := []string{}
-		// Sort the projectIds to ensure the same order is followed by all the sequencers in a decentralized environment
-		sort.Strings(keys)
-		for _, pid := range keys {
-			pids = append(pids, pid)
-			cids = append(cids, projectMostFrequent[pid])
-		}
+			log.Debugln("PIDs and CIDs for epoch: ", epochId, pids, cids)
 
-		log.Debugln("PIDs and CIDs for epoch: ", epochId, pids, cids)
-		batchSubmission, err := BuildBatch(allIds, allData, BatchId, epochId, tree, pids, cids)
-		if err != nil {
-			clients.SendFailureNotification("finalizeBatches", fmt.Sprintf("Batch building error: %s", err.Error()), time.Now().String(), "High")
-			log.Errorln("Error storing the batch: ", err.Error())
-			continue
-		}
+			batchSubmission, err := BuildBatch(allIds, allData, BatchId, epochId, tree, pids, cids)
+			if err != nil {
+				clients.SendFailureNotification("finalizeBatches", fmt.Sprintf("Batch building error: %s", err.Error()), time.Now().String(), "High")
+				log.Errorln("Error storing the batch: ", err.Error())
+				return
+			}
 
-		batchSubmissions = append(batchSubmissions, batchSubmission)
-		log.Debugf("CID: %s Batch: %d", batchSubmission.Cid, BatchId)
-		BatchId++
-		allData = []string{}
-		allIds = []string{}
-		projectMostFrequent = make(map[string]string)
-		projectValueFrequencies = make(map[string]map[string]int)
+			mu.Lock()
+			batchSubmissions = append(batchSubmissions, batchSubmission)
+			BatchId++
+			mu.Unlock()
+
+			log.Debugf("CID: %s Batch: %d", batchSubmission.Cid, BatchId-1)
+		}(batch)
 	}
+
+	wg.Wait()
 	ids := []string{}
 	for _, bs := range batchSubmissions {
 		ids = append(ids, bs.Batch.ID.String())
