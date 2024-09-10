@@ -18,7 +18,7 @@ func main() {
 	redis.RedisClient = redis.NewRedisClient()
 
 	clients.InitializeReportingClient(config.SettingsObj.SlackReportingUrl, time.Duration(config.SettingsObj.HttpTimeout)*time.Second)
-	clients.InitializeRewardsBackendClient(config.SettingsObj.RewardsBackendUrl, time.Duration(config.SettingsObj.HttpTimeout)*time.Second)
+	//clients.InitializeRewardsBackendClient(config.SettingsObj.RewardsBackendUrl, time.Duration(config.SettingsObj.HttpTimeout)*time.Second)
 
 	var wg sync.WaitGroup
 
