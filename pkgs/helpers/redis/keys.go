@@ -9,6 +9,14 @@ func SubmissionSetByHeaderKey(epoch uint64, header string) string {
 	return fmt.Sprintf("%s.%d.%s", pkgs.CollectorKey, epoch, header)
 }
 
+func EPOCH_SIZE() string {
+	return pkgs.EPOCH_SIZE
+}
+
+func SOURCE_CHAIN_BLOCK_TIME() string {
+	return pkgs.SOURCE_CHAIN_BLOCK_TIME
+}
+
 // TransactionReceiptCountByEvent Event can be any kind of indentifier eg. epochId/day
 func TransactionReceiptCountByEvent(event string) string {
 	return fmt.Sprintf("%s.%s", pkgs.TransactionReceiptCount, event)

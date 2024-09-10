@@ -37,4 +37,6 @@ const (
 	EpochSubmissionsKey         = "EpochSubmissionsKey"
 	ProcessTriggerKey           = "TriggeredSequencerProcess"
 	SequencerDayKey             = "SequencerState.Day"
+	EPOCH_SIZE                  = "ProtocolState.EPOCH_SIZE"
+	SOURCE_CHAIN_BLOCK_TIME     = "ProtocolState.SOURCE_CHAIN_BLOCK_TIME"
 )
