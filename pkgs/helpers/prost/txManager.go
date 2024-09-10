@@ -25,6 +25,7 @@ import (
 var txManager *TxManager
 
 const defaultGasLimit = uint64(20000000) // in units
+var backoffInstance = backoff.NewExponentialBackOff()
 
 type TxManager struct {
 	accountHandler *AccountHandler
@@ -32,6 +33,15 @@ type TxManager struct {
 
 func InitializeTxManager() {
 	txManager = &TxManager{accountHandler: NewAccountHandler()}
+	initializeBackoffInstance()
+}
+
+func initializeBackoffInstance() {
+	backoffInstance.InitialInterval = 1 * time.Second
+	backoffInstance.RandomizationFactor = 0.2
+	backoffInstance.Multiplier = 1.2
+	backoffInstance.MaxInterval = 30 * time.Second
+	backoffInstance.MaxElapsedTime = 5 * time.Minute
 }
 
 func (tm *TxManager) EndBatchSubmissionsForEpoch(epochId *big.Int) {
@@ -47,7 +57,7 @@ func (tm *TxManager) EndBatchSubmissionsForEpoch(epochId *big.Int) {
 		}
 		return nil
 	}
-	if err = backoff.Retry(operation, backoff.WithMaxRetries(backoff.NewExponentialBackOff(), 7)); err != nil {
+	if err = backoff.Retry(operation, backoff.WithMaxRetries(backoffInstance, 7)); err != nil {
 		clients.SendFailureNotification("EndBatchSubmissionsForEpoch", fmt.Sprintf("Unable to EndBatchSubmissionsForEpoch %s: %s", epochId.String(), err.Error()), time.Now().String(), "High")
 		log.Debugf("Batch submission completion signal for epoch %s failed after max retries: %s", epochId.String(), err.Error())
 		return
@@ -65,7 +75,7 @@ func (tm *TxManager) GetTxReceipt(txHash common.Hash, identifier string) (*types
 			log.Errorf("Failed to increment txreceipt count in Redis: %s", err.Error())
 		}
 		return err
-	}, backoff.WithMaxRetries(backoff.NewExponentialBackOff(), 7))
+	}, backoff.WithMaxRetries(backoffInstance, 7))
 
 	return receipt, err
 }
@@ -144,7 +154,7 @@ func (tm *TxManager) CommitSubmissionBatch(account *Account, batchSubmission *ip
 		}
 		return nil
 	}
-	if err = backoff.Retry(operation, backoff.WithMaxRetries(backoff.NewExponentialBackOff(), 7)); err != nil {
+	if err = backoff.Retry(operation, backoff.WithMaxRetries(backoffInstance, 7)); err != nil {
 		clients.SendFailureNotification("CommitSubmissionBatch", fmt.Sprintf("Batch %s submission for epoch %s failed after max retries: %s", batchSubmission.Batch.ID.String(), batchSubmission.EpochId.String(), err.Error()), time.Now().String(), "High")
 		log.Debugf("Batch %s submission for epoch %s failed after max retries: ", batchSubmission.Batch.ID.String(), batchSubmission.EpochId.String())
 		return
@@ -180,12 +190,12 @@ func (tm *TxManager) CommitSubmissionBatch(account *Account, batchSubmission *ip
 func (tm *TxManager) BatchUpdateRewards(day *big.Int) []string {
 	slotIds := []*big.Int{}
 	submissions := []*big.Int{}
-	batchSize := config.SettingsObj.BatchSize
 	submittedSlots := []string{}
 
-	account := tm.accountHandler.GetFreeAccount(true)
-	defer tm.accountHandler.ReleaseAccount(account)
+	var wg sync.WaitGroup
+	accounts := []*Account{}
 
+	// Fetch all valid slot-submission pairs from redis
 	slotSubmissionCounts := redis.GetSetKeys(context.Background(), redis.SlotSubmissionSetByDay(day.String()))
 	for _, key := range slotSubmissionCounts {
 		val, err := redis.Get(context.Background(), key)
@@ -220,21 +230,92 @@ func (tm *TxManager) BatchUpdateRewards(day *big.Int) []string {
 			continue
 		}
 
-		submittedSlots = append(submittedSlots, slot.String())
 		slotIds = append(slotIds, slot)
 		submissions = append(submissions, counts)
-		if len(slotIds) == batchSize {
-			txManager.UpdateRewards(account, slotIds, submissions, day)
-			slotIds = []*big.Int{}
-			submissions = []*big.Int{}
-			account.UpdateAuth(1)
+		submittedSlots = append(submittedSlots, slot.String())
+	}
+
+	slotsPerTransaction := config.SettingsObj.BatchSize
+
+	// Send max slots = BatchSize per update transaction
+	requiredTransactions := len(slotIds) / slotsPerTransaction
+
+	var requiredAccounts int
+
+	batchDivision := requiredTransactions / config.SettingsObj.PermissibleBatchesPerAccount
+	if extra := requiredTransactions % config.SettingsObj.PermissibleBatchesPerAccount; extra == 0 {
+		requiredAccounts = batchDivision
+	} else {
+		requiredAccounts = batchDivision + 1
+	}
+
+	// try to get required free accounts
+	for i := 0; i < requiredAccounts; i++ {
+		if account := tm.accountHandler.GetFreeAccount(false); account != nil {
+			accounts = append(accounts, account)
 		}
 	}
 
-	if len(slotIds) > 0 {
-		txManager.UpdateRewards(account, slotIds, submissions, day)
-		account.UpdateAuth(1)
+	if len(accounts) == 0 {
+		log.Warnln("All accounts are occupied, waiting for one account and proceeding with batch submissions")
+		accounts = append(accounts, tm.accountHandler.GetFreeAccount(true))
 	}
+
+	// divide evenly among available accounts
+	transactionsPerAccount := requiredTransactions / len(accounts)
+
+	slotsPerAccount := transactionsPerAccount * slotsPerTransaction
+
+	var begin, end int
+	// send asynchronous batch submissions
+	for i := 0; i < len(accounts); i++ {
+		account := accounts[i]
+
+		begin = i * slotsPerAccount
+		if i == len(accounts)-1 {
+			end = len(slotIds)
+		} else {
+			end = (i + 1) * slotsPerAccount
+		}
+
+		accountSlotIds := slotIds[begin:end]
+		accountSubmissions := submissions[begin:end]
+
+		wg.Add(1)
+
+		// Process the slots asynchronously
+		go func(acc *Account, slotIds, submissions []*big.Int, day *big.Int) {
+			defer wg.Done()
+
+			var start, finish int
+			var steps int
+
+			if len(slotIds)%slotsPerTransaction == 0 {
+				steps = len(slotIds) / slotsPerTransaction
+			} else {
+				steps = len(slotIds)/slotsPerTransaction + 1
+			}
+
+			// Update slot rewards
+			for i := 0; i < steps; i++ {
+				start = i * slotsPerTransaction
+				if i == steps-1 {
+					finish = len(slotIds)
+				} else {
+					finish = (i + 1) * slotsPerTransaction
+				}
+				tm.UpdateRewards(acc, slotIds[start:finish], submissions[start:finish], day)
+				acc.UpdateAuth(1)
+			}
+
+			// Release the account after processing the slots
+			tm.accountHandler.ReleaseAccount(acc)
+		}(account, accountSlotIds, accountSubmissions, day)
+	}
+
+	// Wait for all goroutines to complete
+	wg.Wait()
+
 	return submittedSlots
 }
 
@@ -268,7 +349,7 @@ func (tm *TxManager) UpdateRewards(account *Account, slotIds, submissions []*big
 		}
 		return nil
 	}
-	if err = backoff.Retry(operation, backoff.WithMaxRetries(backoff.NewExponentialBackOff(), 5)); err != nil {
+	if err = backoff.Retry(operation, backoff.WithMaxRetries(backoffInstance, 5)); err != nil {
 		clients.SendFailureNotification("UpdateRewards", fmt.Sprintf("Reward updates for day %s failed: %s", day.String(), err.Error()), time.Now().String(), "High")
 		log.Debugf("Reward updates for day %s failed: ", day.String())
 		return
@@ -288,19 +369,8 @@ func (tm *TxManager) UpdateRewards(account *Account, slotIds, submissions []*big
 	}
 
 	dayLogKey := redis.TriggeredProcessLog(pkgs.UpdateRewards, day.String())
-	existingLog, err := redis.Get(context.Background(), dayLogKey)
-	logEntries := make(map[string]interface{})
-	if err == nil && existingLog != "" {
-		err = json.Unmarshal([]byte(existingLog), &logEntries)
-		if err != nil {
-			clients.SendFailureNotification("UpdateRewardsProcessLog", fmt.Sprintf("Error unmarshalling existing log entries: %v", err), time.Now().String(), "High")
-			log.Errorf("Error unmarshalling existing log entries: %v", err)
-		}
-	}
 
-	logEntries[tx.Hash().Hex()] = logEntry
-
-	if err = redis.SetProcessLog(context.Background(), redis.TriggeredProcessLog(pkgs.UpdateRewards, day.String()), logEntries, 4*time.Hour); err != nil {
+	if err = redis.UpdateProcessLogTable(context.Background(), dayLogKey, tx.Hash().Hex(), logEntry); err != nil {
 		clients.SendFailureNotification("UpdateRewards", err.Error(), time.Now().String(), "High")
 		log.Errorf("UpdateRewards process log error: %s ", err.Error())
 	}
@@ -361,7 +431,7 @@ func (tm *TxManager) EnsureRewardUpdateSuccess(day *big.Int) {
 					}
 					return nil
 				}
-				if err = backoff.Retry(operation, backoff.WithMaxRetries(backoff.NewExponentialBackOff(), 5)); err != nil {
+				if err = backoff.Retry(operation, backoff.WithMaxRetries(backoffInstance, 5)); err != nil {
 					clients.SendFailureNotification("EnsureRewardUpdateSuccess", fmt.Sprintf("Resubmitted reward updates for day %s slots %s failed: %s", day.String(), slotIdStrings, err.Error()), time.Now().String(), "High")
 					log.Debugf("Resubmitted reward updates for day %s failed: ", day.String())
 					return
@@ -476,7 +546,7 @@ func (tm *TxManager) EnsureBatchSubmissionSuccess(epochID *big.Int) {
 						}
 						return nil
 					}
-					if err = backoff.Retry(operation, backoff.WithMaxRetries(backoff.NewExponentialBackOff(), 5)); err != nil {
+					if err = backoff.Retry(operation, backoff.WithMaxRetries(backoffInstance, 5)); err != nil {
 						clients.SendFailureNotification("EnsureBatchSubmissionSuccess", fmt.Sprintf("Resubmission for batch %s failed: %s", batchSubmission.Batch.ID.String(), err.Error()), time.Now().String(), "High")
 						log.Debugf("Resubmission for batch %s failed: ", batchSubmission.Batch.ID.String())
 						return

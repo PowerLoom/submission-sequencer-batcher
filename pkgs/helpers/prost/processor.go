@@ -8,52 +8,57 @@ import (
 	"collector/pkgs/helpers/redis"
 	"context"
 	"fmt"
-	"github.com/cenkalti/backoff/v4"
-	"github.com/ethereum/go-ethereum/accounts/abi"
-	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/rpc"
-	log "github.com/sirupsen/logrus"
+	"github.com/ethereum/go-ethereum"
+	"github.com/ethereum/go-ethereum/common"
 	"math/big"
 	"strconv"
 	"time"
+
+	"github.com/cenkalti/backoff/v4"
+	"github.com/ethereum/go-ethereum/accounts/abi"
+	"github.com/ethereum/go-ethereum/core/types"
+	log "github.com/sirupsen/logrus"
 )
 
 func ProcessEvents(block *types.Block, contractABI abi.ABI) {
-	var receipts []*types.Receipt
+	var logs []types.Log
 	var err error
+
+	hash := block.Hash()
+	filterQuery := ethereum.FilterQuery{
+		BlockHash: &hash,
+		Addresses: []common.Address{common.HexToAddress(config.SettingsObj.ContractAddress)},
+	}
+
 	operation := func() error {
-		receipts, err = Client.BlockReceipts(context.Background(), rpc.BlockNumberOrHashWithNumber(rpc.BlockNumber(block.Number().Int64())))
+		logs, err = Client.FilterLogs(context.Background(), filterQuery)
 		return err
 	}
 
-	if err = backoff.Retry(operation, backoff.WithMaxRetries(backoff.NewConstantBackOff(100*time.Millisecond), 3)); err != nil {
-		log.Errorln("Error fetching block receipts: ", err.Error())
-		clients.SendFailureNotification("ProcessEvents", fmt.Sprintf("Error fetching block receipts: %s", err.Error()), time.Now().String(), "High")
+	if err = backoff.Retry(operation, backoff.WithMaxRetries(backoff.NewConstantBackOff(200*time.Millisecond), 3)); err != nil {
+		log.Errorln("Error fetching logs: ", err.Error())
+		clients.SendFailureNotification("ProcessEvents", fmt.Sprintf("Error fetching logs: %s", err.Error()), time.Now().String(), "High")
 		return
 	}
-	for _, receipt := range receipts {
-		for _, vLog := range receipt.Logs {
-			if vLog.Address.Hex() != config.SettingsObj.ContractAddress {
+
+	for _, vLog := range logs {
+		switch vLog.Topics[0].Hex() {
+		case contractABI.Events["EpochReleased"].ID.Hex():
+			event, err := Instance.ParseEpochReleased(vLog)
+			if err != nil {
+				clients.SendFailureNotification("EpochRelease parse error", err.Error(), time.Now().String(), "High")
+				log.Errorln("Error unpacking epochReleased event:", err)
 				continue
 			}
-			switch vLog.Topics[0].Hex() {
-			case contractABI.Events["EpochReleased"].ID.Hex():
-				event, err := Instance.ParseEpochReleased(*vLog)
-				if err != nil {
-					clients.SendFailureNotification("EpochRelease parse error", err.Error(), time.Now().String(), "High")
-					log.Errorln("Error unpacking epochReleased event:", err)
-					continue
-				}
-				if event.DataMarketAddress.Hex() == config.SettingsObj.DataMarketAddress {
-					log.Debugf("Epoch Released at block %d: %s\n", block.Header().Number, event.EpochId.String())
-					if CurrentEpochID.Cmp(event.EpochId) < 0 {
-						CurrentEpochID = event.EpochId
-						submissionLimit := UpdateSubmissionLimit(new(big.Int).Set(block.Number()))
-						go processEpoch(event.EpochId, submissionLimit, block)
-						if err = redis.Set(context.Background(), pkgs.CurrentEpoch, CurrentEpochID.String(), 0); err != nil {
-							clients.SendFailureNotification("ProcessEvents", fmt.Sprintf("Unable to update current epoch in redis: %s", err.Error()), time.Now().String(), "High")
-							log.Errorln("Unable to update current epoch in redis:", err.Error())
-						}
+			if event.DataMarketAddress.Hex() == config.SettingsObj.DataMarketAddress {
+				log.Debugf("Epoch Released at block %d: %s\n", block.Header().Number, event.EpochId.String())
+				if CurrentEpochID.Cmp(event.EpochId) < 0 {
+					CurrentEpochID = event.EpochId
+					submissionLimit := UpdateSubmissionLimit(new(big.Int).Set(block.Number()))
+					go processEpoch(event.EpochId, submissionLimit, block)
+					if err = redis.Set(context.Background(), pkgs.CurrentEpoch, CurrentEpochID.String(), 0); err != nil {
+						clients.SendFailureNotification("ProcessEvents", fmt.Sprintf("Unable to update current epoch in redis: %s", err.Error()), time.Now().String(), "High")
+						log.Errorln("Unable to update current epoch in redis:", err.Error())
 					}
 				}
 			}
@@ -112,7 +117,7 @@ func processEpoch(epochId, submissionLimit *big.Int, begin *types.Block) {
 		triggerCollectionFlow(epochId, headers, Day)
 	}(epochId, headers, Day)
 
-	updatedDay := new(big.Int).SetUint64(((epochId.Uint64() - 1) / EpochsPerDay) + 1 + pkgs.DayBuffer)
+	updatedDay := new(big.Int).SetUint64(((epochId.Uint64() - 1) / EpochsPerDay) + 1 + pkgs.DayBuffer)  // 2828 / 10 = 282 + 1 == 283
 	if updatedDay.Cmp(Day) > 0 {
 		prev := new(big.Int).Set(Day)
 		Day = new(big.Int).Set(updatedDay)
@@ -123,6 +128,13 @@ func processEpoch(epochId, submissionLimit *big.Int, begin *types.Block) {
 			log.Errorf("Unable to update day %s in redis: %s", Day.String(), err.Error())
 		}
 		UpdateRewards(prev)
+		// set expiry of 24 hours for day submissions set and slot ID submissions by day keys within that set
+		prevDaySlotSubmissionsKeySet := redis.SlotSubmissionSetByDay(prev.String())
+		err = redis.Expire(context.Background(), prevDaySlotSubmissionsKeySet, pkgs.Day*7)
+		if err != nil {
+			clients.SendFailureNotification("processEpoch", fmt.Sprintf("Unable to set expiry for %s in redis: %s", prevDaySlotSubmissionsKeySet, err.Error()), time.Now().String(), "Medium")
+			log.Errorf("Unable to set expiry for %s in redis: %s", prevDaySlotSubmissionsKeySet, err.Error())
+		}
 	}
 }
 
@@ -131,6 +143,7 @@ func triggerCollectionFlow(epochID *big.Int, headers []string, day *big.Int) {
 	if batchSubmissions, err := merkle.BuildBatchSubmissions(epochID, headers); err != nil {
 		log.Debugln("Error building batched merkle tree: ", err)
 	} else {
+		UpdateSubmissionCounts(batchSubmissions, day)
 		txManager.CommitSubmissionBatches(batchSubmissions)
 		//log.Debugf("Merkle tree built, resetting db for epoch: %d", epochID)
 		// remove submissions as we no longer need them
@@ -150,7 +163,7 @@ func triggerCollectionFlow(epochID *big.Int, headers []string, day *big.Int) {
 			log.Errorln("Redis error: ", err.Error())
 		}
 		redis.Delete(context.Background(), redis.TransactionReceiptCountByEvent(epochID.String()))
-		UpdateSubmissionCounts(batchSubmissions, day)
+
 		txManager.EndBatchSubmissionsForEpoch(epochID)
 	}
 }
