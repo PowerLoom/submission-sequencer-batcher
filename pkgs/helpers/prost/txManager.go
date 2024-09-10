@@ -37,11 +37,11 @@ func InitializeTxManager() {
 }
 
 func initializeBackoffInstance() {
-	backoffInstance.InitialInterval = 1 * time.Second
+	backoffInstance.InitialInterval = 3 * time.Second
 	backoffInstance.RandomizationFactor = 0.2
 	backoffInstance.Multiplier = 1.2
 	backoffInstance.MaxInterval = 30 * time.Second
-	backoffInstance.MaxElapsedTime = 5 * time.Minute
+	backoffInstance.MaxElapsedTime = 100 * time.Second
 }
 
 func (tm *TxManager) EndBatchSubmissionsForEpoch(epochId *big.Int) {
@@ -67,6 +67,7 @@ func (tm *TxManager) EndBatchSubmissionsForEpoch(epochId *big.Int) {
 func (tm *TxManager) GetTxReceipt(txHash common.Hash, identifier string) (*types.Receipt, error) {
 	var receipt *types.Receipt
 	var err error
+	time.Sleep(2 * time.Second) // waiting for few blocks to pass
 	err = backoff.Retry(func() error {
 		receipt, err = Client.TransactionReceipt(context.Background(), txHash)
 		err = redis.RedisClient.Incr(context.Background(), redis.TransactionReceiptCountByEvent(identifier)).Err()
