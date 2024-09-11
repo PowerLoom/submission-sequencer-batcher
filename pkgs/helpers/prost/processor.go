@@ -92,32 +92,32 @@ func processEpoch(epochId, submissionLimit *big.Int, begin *types.Block) {
 		log.Errorln("TriggerCollectionFlow process log error: ", err.Error())
 	}
 
-	go func(epochId *big.Int, headers []string, Day *big.Int) {
-		epochSizeString, err := redis.Get(context.Background(), redis.EPOCH_SIZE())
-		if err != nil {
-			log.Fatalf("Error fetching EPOCH_SIZE from redis: %s", err.Error())
-		}
+	//go func(epochId *big.Int, headers []string, Day *big.Int) {
+	//	epochSizeString, err := redis.Get(context.Background(), redis.EPOCH_SIZE())
+	//	if err != nil {
+	//		log.Fatalf("Error fetching EPOCH_SIZE from redis: %s", err.Error())
+	//	}
+	//
+	//	sourceChainBlockTimeString, err := redis.Get(context.Background(), redis.SOURCE_CHAIN_BLOCK_TIME())
+	//	if err != nil {
+	//		log.Fatalf("Error fetching SOURCE_CHAIN_BLOCK_TIME from redis: %s", err.Error())
+	//	}
+	//
+	//	epochSize, err := strconv.Atoi(epochSizeString)
+	//	if err != nil {
+	//		log.Fatalf("Error converting EPOCH_SIZE to int: %s", err.Error())
+	//	}
+	//
+	//	sourceChainBlockTime, err := strconv.Atoi(sourceChainBlockTimeString)
+	//	if err != nil {
+	//		log.Fatalf("Error converting SOURCE_CHAIN_BLOCK_TIME to int: %s", err.Error())
+	//	}
+	//
+	//	time.Sleep(time.Duration(epochSize*sourceChainBlockTime) * time.Millisecond)
+	//	triggerCollectionFlow(epochId, headers, Day)
+	//}(epochId, headers, Day)
 
-		sourceChainBlockTimeString, err := redis.Get(context.Background(), redis.SOURCE_CHAIN_BLOCK_TIME())
-		if err != nil {
-			log.Fatalf("Error fetching SOURCE_CHAIN_BLOCK_TIME from redis: %s", err.Error())
-		}
-
-		epochSize, err := strconv.Atoi(epochSizeString)
-		if err != nil {
-			log.Fatalf("Error converting EPOCH_SIZE to int: %s", err.Error())
-		}
-
-		sourceChainBlockTime, err := strconv.Atoi(sourceChainBlockTimeString)
-		if err != nil {
-			log.Fatalf("Error converting SOURCE_CHAIN_BLOCK_TIME to int: %s", err.Error())
-		}
-
-		time.Sleep(time.Duration(epochSize*sourceChainBlockTime) * time.Millisecond)
-		triggerCollectionFlow(epochId, headers, Day)
-	}(epochId, headers, Day)
-
-	updatedDay := new(big.Int).SetUint64(((epochId.Uint64() - 1) / EpochsPerDay) + 1 + pkgs.DayBuffer)  // 2828 / 10 = 282 + 1 == 283
+	updatedDay := new(big.Int).SetUint64(((epochId.Uint64() - 1) / EpochsPerDay) + 1 + pkgs.DayBuffer) // 2828 / 10 = 282 + 1 == 283
 	if updatedDay.Cmp(Day) > 0 {
 		prev := new(big.Int).Set(Day)
 		Day = new(big.Int).Set(updatedDay)
@@ -127,6 +127,7 @@ func processEpoch(epochId, submissionLimit *big.Int, begin *types.Block) {
 			clients.SendFailureNotification("processEpoch", fmt.Sprintf("Unable to update day %s in redis: %s", Day.String(), err.Error()), time.Now().String(), "Medium")
 			log.Errorf("Unable to update day %s in redis: %s", Day.String(), err.Error())
 		}
+		triggerCollectionFlow(epochId, headers, prev)
 		UpdateRewards(prev)
 		// set expiry of 24 hours for day submissions set and slot ID submissions by day keys within that set
 		prevDaySlotSubmissionsKeySet := redis.SlotSubmissionSetByDay(prev.String())
@@ -135,6 +136,8 @@ func processEpoch(epochId, submissionLimit *big.Int, begin *types.Block) {
 			clients.SendFailureNotification("processEpoch", fmt.Sprintf("Unable to set expiry for %s in redis: %s", prevDaySlotSubmissionsKeySet, err.Error()), time.Now().String(), "Medium")
 			log.Errorf("Unable to set expiry for %s in redis: %s", prevDaySlotSubmissionsKeySet, err.Error())
 		}
+	} else {
+		triggerCollectionFlow(epochId, headers, Day)
 	}
 }
 
