@@ -64,7 +64,7 @@ func UpdateRewards(day *big.Int) {
 	}
 	redis.Delete(context.Background(), redis.TransactionReceiptCountByEvent(day.String()))
 
-	clients.BulkAssignSlotRewards(int(day.Int64()), slots)
+	//clients.BulkAssignSlotRewards(int(day.Int64()), slots)
 }
 
 func UpdateSubmissionCounts(batchSubmissions []*ipfs.BatchSubmission, day *big.Int) {
