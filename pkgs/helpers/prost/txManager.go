@@ -26,6 +26,7 @@ var txManager *TxManager
 
 const defaultGasLimit = uint64(20000000) // in units
 var backoffInstance = backoff.NewExponentialBackOff()
+var backoffLinear = backoff.NewConstantBackOff(1 * time.Second)
 
 type TxManager struct {
 	accountHandler *AccountHandler
@@ -67,16 +68,22 @@ func (tm *TxManager) EndBatchSubmissionsForEpoch(epochId *big.Int) {
 func (tm *TxManager) GetTxReceipt(txHash common.Hash, identifier string) (*types.Receipt, error) {
 	var receipt *types.Receipt
 	var err error
-	time.Sleep(2 * time.Second) // waiting for few blocks to pass
+	time.Sleep(1 * time.Second) // waiting for few blocks to pass
 	err = backoff.Retry(func() error {
-		receipt, err = Client.TransactionReceipt(context.Background(), txHash)
+		receiptString, err := redis.Get(context.Background(), redis.ReceiptProcessed(txHash.Hex()))
+		err = json.Unmarshal([]byte(receiptString), &receipt)
+		if err != nil {
+			clients.SendFailureNotification("GetTxReceipt", fmt.Sprintf("Failed to unmarshal txreceipt: %s", err.Error()), time.Now().String(), "Low")
+			log.Errorf("Failed to unmarshal txreceipt: %s", err.Error())
+			return err
+		}
 		err = redis.RedisClient.Incr(context.Background(), redis.TransactionReceiptCountByEvent(identifier)).Err()
 		if err != nil {
 			clients.SendFailureNotification("GetTxReceipt", fmt.Sprintf("Failed to increment txreceipt count in Redis: %s", err.Error()), time.Now().String(), "Low")
 			log.Errorf("Failed to increment txreceipt count in Redis: %s", err.Error())
 		}
 		return err
-	}, backoff.WithMaxRetries(backoffInstance, 7))
+	}, backoff.WithMaxRetries(backoffLinear, 5))
 
 	return receipt, err
 }

@@ -76,3 +76,7 @@ func LatestDailyTaskCompletion(slotId string) string {
 func SlotStreakCounter(slotId string) string {
 	return fmt.Sprintf("%s.%s", pkgs.SlotStreakKey, slotId)
 }
+
+func ReceiptProcessed(hash string) string {
+	return fmt.Sprintf("%s.%s", pkgs.ReceiptProcessedKey, hash)
+}

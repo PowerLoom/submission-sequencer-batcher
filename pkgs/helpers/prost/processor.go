@@ -7,6 +7,7 @@ import (
 	"collector/pkgs/helpers/merkle"
 	"collector/pkgs/helpers/redis"
 	"context"
+	"encoding/json"
 	"fmt"
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common"
@@ -62,7 +63,66 @@ func ProcessEvents(block *types.Block, contractABI abi.ABI) {
 					}
 				}
 			}
+		case contractABI.Events["DailyTaskCompletedEvent"].ID.Hex():
+			event, err := Instance.ParseDailyTaskCompletedEvent(vLog)
+			if err != nil {
+				clients.SendFailureNotification("DailyTaskCompletedEvent parse error", err.Error(), time.Now().String(), "High")
+				log.Errorln("Error unpacking DailyTaskCompletedEvent:", err)
+				continue
+			}
+			if event.DataMarketAddress.Hex() == config.SettingsObj.DataMarketAddress {
+				log.Debugf("Daily Task Completed at block %d: day: %s\n", block.Header().Number, event.DayId.String())
+				// get hash for tx log is coming from
+				txHash := vLog.TxHash.Hex()
+				// get receipt for tx log is coming from
+				receipt, err := Client.TransactionReceipt(context.Background(), common.HexToHash(txHash))
+				if err != nil {
+					clients.SendFailureNotification("ProcessEvents", fmt.Sprintf("Unable to fetch transaction receipt for tx %s: %s", txHash, err.Error()), time.Now().String(), "Medium")
+					log.Errorln("Unable to fetch transaction receipt for tx", txHash, err.Error())
+					continue
+				}
+				receiptMarshalled, err := json.Marshal(receipt)
+				if err != nil {
+					clients.SendFailureNotification("ProcessEvents", fmt.Sprintf("Unable to marshal transaction receipt for tx %s: %s", txHash, err.Error()), time.Now().String(), "Medium")
+					log.Errorln("Unable to marshal transaction receipt for tx", txHash, err.Error())
+					continue
+				}
+				receiptString := string(receiptMarshalled)
+				if err = redis.Set(context.Background(), redis.ReceiptProcessed(txHash), receiptString, time.Hour); err != nil {
+					clients.SendFailureNotification("ProcessEvents", fmt.Sprintf("Unable to set daily task completed in redis: %s", err.Error()), time.Now().String(), "High")
+					log.Errorln("Unable to set daily task completed in redis:", err.Error())
+				}
+			}
+		case contractABI.Events["SnapshotBatchSubmitted"].ID.Hex():
+			event, err := Instance.ParseSnapshotBatchSubmitted(vLog)
+			if err != nil {
+				clients.SendFailureNotification("SnapshotBatchSubmittedEvent parse error", err.Error(), time.Now().String(), "High")
+				log.Errorln("Error unpacking SnapshotBatchSubmittedEvent:", err)
+				continue
+			}
+			if event.DataMarketAddress.Hex() == config.SettingsObj.DataMarketAddress {
+				log.Debugf("Snapshot Batch Submitted at block %d: epochId: %s batchId: %s\n", block.Header().Number, event.EpochId.String(), event.BatchId.String())
+				txHash := vLog.TxHash.Hex()
+				receipt, err := Client.TransactionReceipt(context.Background(), common.HexToHash(txHash))
+				if err != nil {
+					clients.SendFailureNotification("ProcessEvents", fmt.Sprintf("Unable to fetch transaction receipt for tx %s: %s", txHash, err.Error()), time.Now().String(), "Medium")
+					log.Errorln("Unable to fetch transaction receipt for tx", txHash, err.Error())
+					continue
+				}
+				receiptMarshalled, err := json.Marshal(receipt)
+				if err != nil {
+					clients.SendFailureNotification("ProcessEvents", fmt.Sprintf("Unable to marshal transaction receipt for tx %s: %s", txHash, err.Error()), time.Now().String(), "Medium")
+					log.Errorln("Unable to marshal transaction receipt for tx", txHash, err.Error())
+					continue
+				}
+				receiptString := string(receiptMarshalled)
+				if err = redis.Set(context.Background(), redis.ReceiptProcessed(txHash), receiptString, time.Hour); err != nil {
+					clients.SendFailureNotification("ProcessEvents", fmt.Sprintf("Unable to set daily task completed in redis: %s", err.Error()), time.Now().String(), "High")
+					log.Errorln("Unable to set daily task completed in redis:", err.Error())
+				}
+			}
 		}
+
 	}
 }
 
