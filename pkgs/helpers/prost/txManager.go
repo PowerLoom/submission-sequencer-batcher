@@ -77,6 +77,7 @@ func (tm *TxManager) GetTxReceipt(txHash common.Hash, identifier string) (*types
 			log.Errorf("Failed to unmarshal txreceipt: %s", err.Error())
 			return err
 		}
+		log.Debugf("Fetched receipt for tx %s: %v", txHash.Hex(), receipt)
 		err = redis.RedisClient.Incr(context.Background(), redis.TransactionReceiptCountByEvent(identifier)).Err()
 		if err != nil {
 			clients.SendFailureNotification("GetTxReceipt", fmt.Sprintf("Failed to increment txreceipt count in Redis: %s", err.Error()), time.Now().String(), "Low")
