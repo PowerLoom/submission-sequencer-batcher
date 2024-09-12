@@ -117,8 +117,8 @@ func ProcessEvents(block *types.Block, contractABI abi.ABI) {
 				}
 				receiptString := string(receiptMarshalled)
 				if err = redis.Set(context.Background(), redis.ReceiptProcessed(txHash), receiptString, time.Hour); err != nil {
-					clients.SendFailureNotification("ProcessEvents", fmt.Sprintf("Unable to set daily task completed in redis: %s", err.Error()), time.Now().String(), "High")
-					log.Errorln("Unable to set daily task completed in redis:", err.Error())
+					clients.SendFailureNotification("ProcessEvents", fmt.Sprintf("Unable to set snapshot batch submitted in redis: %s", err.Error()), time.Now().String(), "High")
+					log.Errorln("Unable to set snapshot batch submitted in redis:", err.Error())
 				}
 			}
 		}

@@ -72,7 +72,7 @@ func (tm *TxManager) GetTxReceipt(txHash common.Hash, identifier string) (*types
 	err = backoff.Retry(func() error {
 		receiptString, err := redis.Get(context.Background(), redis.ReceiptProcessed(txHash.Hex()))
 		err = json.Unmarshal([]byte(receiptString), &receipt)
-		if err != nil {
+		if err != nil && receiptString != "" {
 			clients.SendFailureNotification("GetTxReceipt", fmt.Sprintf("Failed to unmarshal txreceipt: %s", err.Error()), time.Now().String(), "Low")
 			log.Errorf("Failed to unmarshal txreceipt: %s", err.Error())
 			return err
