@@ -72,9 +72,7 @@ func ProcessEvents(block *types.Block, contractABI abi.ABI) {
 			}
 			if event.DataMarketAddress.Hex() == config.SettingsObj.DataMarketAddress {
 				log.Debugf("Daily Task Completed at block %d: day: %s\n", block.Header().Number, event.DayId.String())
-				// get hash for tx log is coming from
 				txHash := vLog.TxHash.Hex()
-				// get receipt for tx log is coming from
 				receipt, err := Client.TransactionReceipt(context.Background(), common.HexToHash(txHash))
 				if err != nil {
 					clients.SendFailureNotification("ProcessEvents", fmt.Sprintf("Unable to fetch transaction receipt for tx %s: %s", txHash, err.Error()), time.Now().String(), "Medium")
@@ -118,6 +116,34 @@ func ProcessEvents(block *types.Block, contractABI abi.ABI) {
 				receiptString := string(receiptMarshalled)
 				if err = redis.Set(context.Background(), redis.ReceiptProcessed(txHash), receiptString, time.Hour); err != nil {
 					clients.SendFailureNotification("ProcessEvents", fmt.Sprintf("Unable to set snapshot batch submitted in redis: %s", err.Error()), time.Now().String(), "High")
+					log.Errorln("Unable to set snapshot batch submitted in redis:", err.Error())
+				}
+			}
+		case contractABI.Events["DelayedBatchSubmitted"].ID.Hex():
+			event, err := Instance.ParseDelayedBatchSubmitted(vLog)
+			if err != nil {
+				clients.SendFailureNotification("DelayedBatchSubmittedEvent parse error", err.Error(), time.Now().String(), "High")
+				log.Errorln("Error unpacking DelayedBatchSubmittedEvent:", err)
+				continue
+			}
+			if event.DataMarketAddress.Hex() == config.SettingsObj.DataMarketAddress {
+				log.Debugf("Delayed Batch Submitted at block %d: epochId: %s batchId: %s\n", block.Header().Number, event.EpochId.String(), event.BatchId.String())
+				txHash := vLog.TxHash.Hex()
+				receipt, err := Client.TransactionReceipt(context.Background(), common.HexToHash(txHash))
+				if err != nil {
+					clients.SendFailureNotification("ProcessEvents", fmt.Sprintf("Unable to fetch transaction receipt for tx %s: %s", txHash, err.Error()), time.Now().String(), "Medium")
+					log.Errorln("Unable to fetch transaction receipt for tx", txHash, err.Error())
+					continue
+				}
+				receiptMarshalled, err := json.Marshal(receipt)
+				if err != nil {
+					clients.SendFailureNotification("ProcessEvents", fmt.Sprintf("Unable to marshal transaction receipt for tx %s: %s", txHash, err.Error()), time.Now().String(), "Medium")
+					log.Errorln("Unable to marshal transaction receipt for tx", txHash, err.Error())
+					continue
+				}
+				receiptString := string(receiptMarshalled)
+				if err = redis.Set(context.Background(), redis.ReceiptProcessed(txHash), receiptString, time.Hour); err != nil {
+					clients.SendFailureNotification("ProcessEvents", fmt.Sprintf("Unable to set delayed batch submitted in redis: %s", err.Error()), time.Now().String(), "High")
 					log.Errorln("Unable to set snapshot batch submitted in redis:", err.Error())
 				}
 			}
