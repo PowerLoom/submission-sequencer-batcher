@@ -9,6 +9,7 @@ import (
 	"collector/pkgs/helpers/utils"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/cenkalti/backoff/v4"
 	"github.com/ethereum/go-ethereum/common"
@@ -71,8 +72,12 @@ func (tm *TxManager) GetTxReceipt(txHash common.Hash, identifier string) (*types
 	time.Sleep(1 * time.Second) // waiting for few blocks to pass
 	err = backoff.Retry(func() error {
 		receiptString, err := redis.Get(context.Background(), redis.ReceiptProcessed(txHash.Hex()))
+		if receiptString == "" {
+			log.Errorf("Receipt not found in Redis for tx %s", txHash.Hex())
+			return errors.New("receipt not found in Redis")
+		}
 		err = json.Unmarshal([]byte(receiptString), &receipt)
-		if err != nil || receiptString == "" {
+		if err != nil {
 			clients.SendFailureNotification("GetTxReceipt", fmt.Sprintf("Failed to unmarshal txreceipt: %s", err.Error()), time.Now().String(), "Low")
 			log.Errorf("Failed to unmarshal txreceipt: %s", err.Error())
 			return err
