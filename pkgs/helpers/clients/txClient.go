@@ -93,7 +93,7 @@ func SubmitSubmissionBatch(dataMarketAddress string, batchCid string, batchId st
 		return fmt.Errorf("unable to marshal notification: %w", err)
 	}
 
-	url := fmt.Sprintf("%s/submitSubmissionBatch", t.url)
+	url := fmt.Sprintf("%s/submitSubmissionBatch", txRelayerClient.url)
 
 	resp, err := txRelayerClient.client.Post(url, "application/json", bytes.NewBuffer(jsonData))
 
