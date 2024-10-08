@@ -84,7 +84,7 @@ func SubmitSubmissionBatch(dataMarketAddress string, batchCid string, batchId st
 		EpochId:               epochId,
 		ProjectIds:            projectIds,
 		SnapshotCids:          snapshotCids,
-		FinalizedCidsRootHash: finalizedCidsRootHash,
+		FinalizedCidsRootHash: fmt.Sprintf("0x%x", finalizedCidsRootHash),
 		AuthToken:             config.SettingsObj.TxRelayerAuthWriteToken,
 	}
 
