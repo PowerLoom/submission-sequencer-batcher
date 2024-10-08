@@ -2,10 +2,11 @@ package config
 
 import (
 	"encoding/json"
-	"github.com/ethereum/go-ethereum/common"
-	log "github.com/sirupsen/logrus"
 	"os"
 	"strconv"
+
+	"github.com/ethereum/go-ethereum/common"
+	log "github.com/sirupsen/logrus"
 )
 
 var SettingsObj *Settings
@@ -18,6 +19,8 @@ type Settings struct {
 	RedisDB                      string
 	IPFSUrl                      string
 	DataMarketAddress            string
+	TxRelayerUrl                 string
+	TxRelayerAuthWriteToken      string
 	DataMarketContractAddress    common.Address
 	SignerAccountAddresses       []string
 	PrivateKeys                  []string
@@ -43,6 +46,8 @@ func LoadConfig() {
 		"REDIS_PORT",
 		"IPFS_URL",
 		"DATA_MARKET_CONTRACT",
+		"TX_RELAYER_URL",
+		"TX_RELAYER_AUTH_WRITE_TOKEN",
 		"AUTH_READ_TOKEN",
 		//"AUTH_WRITE_TOKEN",
 		"SIGNER_ACCOUNT_ADDRESSES",
@@ -74,6 +79,8 @@ func LoadConfig() {
 		RedisDB:                   getEnv("REDIS_DB", ""),
 		IPFSUrl:                   getEnv("IPFS_URL", ""),
 		DataMarketAddress:         getEnv("DATA_MARKET_CONTRACT", ""),
+		TxRelayerUrl:              getEnv("TX_RELAYER_URL", ""),
+		TxRelayerAuthWriteToken:   getEnv("TX_RELAYER_AUTH_WRITE_TOKEN", ""),
 		AuthReadToken:             getEnv("AUTH_READ_TOKEN", ""),
 		AuthWriteToken:            getEnv("AUTH_WRITE_TOKEN", ""),
 		SlackReportingUrl:         getEnv("SLACK_REPORTING_URL", ""),

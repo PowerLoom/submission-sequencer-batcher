@@ -9,11 +9,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math/big"
+	"time"
+
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common"
-	"math/big"
-	"strconv"
-	"time"
 
 	"github.com/cenkalti/backoff/v4"
 	"github.com/ethereum/go-ethereum/accounts/abi"
@@ -228,31 +228,48 @@ func processEpoch(epochId, submissionLimit *big.Int, begin *types.Block) {
 }
 
 func triggerCollectionFlow(epochID *big.Int, headers []string, day *big.Int) {
-
 	if batchSubmissions, err := merkle.BuildBatchSubmissions(epochID, headers); err != nil {
 		log.Debugln("Error building batched merkle tree: ", err)
 	} else {
 		UpdateSubmissionCounts(batchSubmissions, day)
-		txManager.CommitSubmissionBatches(batchSubmissions)
-		//log.Debugf("Merkle tree built, resetting db for epoch: %d", epochID)
-		// remove submissions as we no longer need them
+		// send batch size to tx manager
+		if err := clients.SendSubmissionBatchSize(epochID, len(batchSubmissions)); err != nil {
+			errorMsg := fmt.Sprintf("Error sending submission batch size for epoch %s: %v", epochID.String(), err)
+			clients.SendFailureNotification("SendSubmissionBatchSize", errorMsg, time.Now().String(), "Medium")
+			log.Errorln(errorMsg)
+		}
+		// now send the actual batches by looping through them
+		for _, batch := range batchSubmissions {
+			log.Debugln("Submitting batch with CID against batch ID and epoch ID", batch.Cid, batch.Batch.ID.String(), epochID.String())
+			clients.SubmitSubmissionBatch(
+				config.SettingsObj.DataMarketAddress,
+				batch.Cid,
+				batch.Batch.ID.String(),
+				epochID,
+				batch.Batch.Pids,
+				batch.Batch.Cids,
+				string(batch.FinalizedCidsRootHash),
+			)
+			// a bit of a delay
+			time.Sleep(time.Duration(config.SettingsObj.BlockTime*500) * time.Millisecond)
+		}
 		redis.ResetCollectorDBSubmissions(context.Background(), epochID, headers)
 		// ensure all transactions were included after waiting for new block
-		log.Debugln("Verifying all batch submissions")
-		txManager.EnsureBatchSubmissionSuccess(epochID)
-		if count, err := redis.Get(context.Background(), redis.TransactionReceiptCountByEvent(epochID.String())); count != "" {
-			log.Debugf("Transaction receipt fetches for epoch %s: %s", epochID.String(), count)
-			n, _ := strconv.Atoi(count)
-			if n > len(batchSubmissions)*3 { // giving upto 3 retries per txn
-				clients.SendFailureNotification("EnsureBatchSubmissionSuccess", fmt.Sprintf("Too many transaction receipts fetched for epoch %s: %s", epochID.String(), count), time.Now().String(), "Medium")
-				log.Errorf("Too many transaction receipts fetched for epoch %s: %s", epochID.String(), count)
-			}
-		} else if err != nil {
-			clients.SendFailureNotification("Redis error", err.Error(), time.Now().String(), "High")
-			log.Errorln("Redis error: ", err.Error())
-		}
+		// log.Debugln("Verifying all batch submissions")
+		// txManager.EnsureBatchSubmissionSuccess(epochID)
+		// if count, err := redis.Get(context.Background(), redis.TransactionReceiptCountByEvent(epochID.String())); count != "" {
+		// 	log.Debugf("Transaction receipt fetches for epoch %s: %s", epochID.String(), count)
+		// 	n, _ := strconv.Atoi(count)
+		// 	if n > len(batchSubmissions)*3 { // giving upto 3 retries per txn
+		// 		clients.SendFailureNotification("EnsureBatchSubmissionSuccess", fmt.Sprintf("Too many transaction receipts fetched for epoch %s: %s", epochID.String(), count), time.Now().String(), "Medium")
+		// 		log.Errorf("Too many transaction receipts fetched for epoch %s: %s", epochID.String(), count)
+		// 	}
+		// } else if err != nil {
+		// 	clients.SendFailureNotification("Redis error", err.Error(), time.Now().String(), "High")
+		// 	log.Errorln("Redis error: ", err.Error())
+		// }
 		redis.Delete(context.Background(), redis.TransactionReceiptCountByEvent(epochID.String()))
 
-		txManager.EndBatchSubmissionsForEpoch(epochID)
+		// txManager.EndBatchSubmissionsForEpoch(epochID)
 	}
 }

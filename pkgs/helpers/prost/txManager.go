@@ -486,7 +486,7 @@ func (tm *TxManager) EnsureBatchSubmissionSuccess(epochID *big.Int) {
 		}
 		if resubmissionIterations > pkgs.MaxBatchRetries {
 			clients.SendFailureNotification("EnsureBatchSubmissionSuccess", fmt.Sprintf("Reached max retry iterations for epoch: %s", epochID.String()), time.Now().String(), "High")
-			log.Errorf("Reached max retry iterations for epoch: %s", epochID.String())
+			log.Errorf("Reached max retry iterations for epoch: %s . Batches not confirmed: ", epochID.String())
 			for _, key := range keys {
 				if _, err := redis.RedisClient.Del(context.Background(), key).Result(); err != nil {
 					log.Errorf("Unable to delete transaction from redis: %s\n", err.Error())

@@ -101,7 +101,7 @@ func finalizeBatches(batchedKeys [][]string, epochId *big.Int, tree *imt.Increme
 			localProjectValueFrequencies := make(map[string]map[string]int)
 
 			for _, key := range batch {
-				val, err := redis.Get(context.Background(), key)
+				val, err := redis.Get(context.Background(), key)  // submission data is uuid.submission_json
 
 				if err != nil {
 					clients.SendFailureNotification("finalizeBatches", fmt.Sprintf("Error fetching data from redis: %s", err.Error()), time.Now().String(), "High")
@@ -168,7 +168,7 @@ func finalizeBatches(batchedKeys [][]string, epochId *big.Int, tree *imt.Increme
 			sort.Strings(keys)
 			for _, pid := range keys {
 				pids = append(pids, pid)
-				cids = append(cids, localProjectMostFrequent[pid])
+				cids = append(cids, localProjectMostFrequent[pid]) // finalized CIDs
 			}
 
 			log.Debugln("PIDs and CIDs for epoch: ", epochId, pids, cids)
