@@ -11,7 +11,6 @@ import (
 	"fmt"
 	"math/big"
 	"sort"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -21,8 +20,6 @@ import (
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/protobuf/encoding/protojson"
 )
-
-var BatchId int
 
 func UpdateMerkleTree(sortedData []string, tree *imt.IncrementalMerkleTree) (*imt.IncrementalMerkleTree, error) {
 	for _, value := range sortedData {
@@ -101,7 +98,7 @@ func finalizeBatches(batchedKeys [][]string, epochId *big.Int, tree *imt.Increme
 			localProjectValueFrequencies := make(map[string]map[string]int)
 
 			for _, key := range batch {
-				val, err := redis.Get(context.Background(), key)  // submission data is uuid.submission_json
+				val, err := redis.Get(context.Background(), key) // submission data is uuid.submission_json
 
 				if err != nil {
 					clients.SendFailureNotification("finalizeBatches", fmt.Sprintf("Error fetching data from redis: %s", err.Error()), time.Now().String(), "High")
@@ -111,11 +108,11 @@ func finalizeBatches(batchedKeys [][]string, epochId *big.Int, tree *imt.Increme
 
 				log.Debugln(fmt.Sprintf("Processing key %s and value %s", key, val))
 
-			if len(val) == 0 {
-				clients.SendFailureNotification("finalizeBatches", fmt.Sprintf("Value has expired for key, not being counted in batch: %s", key), time.Now().String(), "High")
-				log.Errorln("Value has expired for key:  ", key)
-				continue
-			}
+				if len(val) == 0 {
+					clients.SendFailureNotification("finalizeBatches", fmt.Sprintf("Value has expired for key, not being counted in batch: %s", key), time.Now().String(), "High")
+					log.Errorln("Value has expired for key:  ", key)
+					continue
+				}
 
 				parts := strings.Split(key, ".")
 				if len(parts) != 3 {
@@ -173,7 +170,7 @@ func finalizeBatches(batchedKeys [][]string, epochId *big.Int, tree *imt.Increme
 
 			log.Debugln("PIDs and CIDs for epoch: ", epochId, pids, cids)
 
-			batchSubmission, err := BuildBatch(allIds, allData, BatchId, epochId, tree, pids, cids)
+			batchSubmission, err := BuildBatch(allIds, allData, epochId, tree, pids, cids)
 			if err != nil {
 				clients.SendFailureNotification("finalizeBatches", fmt.Sprintf("Batch building error: %s", err.Error()), time.Now().String(), "High")
 				log.Errorln("Error storing the batch: ", err.Error())
@@ -182,24 +179,18 @@ func finalizeBatches(batchedKeys [][]string, epochId *big.Int, tree *imt.Increme
 
 			mu.Lock()
 			batchSubmissions = append(batchSubmissions, batchSubmission)
-			BatchId++
 			mu.Unlock()
 
-			log.Debugf("CID: %s Batch: %d", batchSubmission.Cid, BatchId-1)
+			log.Debugf("CID: %s Epoch: %s", batchSubmission.Cid, epochId.String())
 		}(batch)
 	}
 
 	wg.Wait()
-	ids := []string{}
-	for _, bs := range batchSubmissions {
-		ids = append(ids, bs.Batch.ID.String())
-	}
 
 	// Set finalized batches in redis for epochId
 	logEntry := map[string]interface{}{
 		"epoch_id":                epochId.String(),
 		"finalized_batches_count": len(batchSubmissions),
-		"finalized_batch_ids":     ids,
 		"timestamp":               time.Now().Unix(),
 	}
 
@@ -252,7 +243,7 @@ func arrangeKeysInBatches(keys []string) [][]string {
 	return batches
 }
 
-func BuildBatch(dataIds, data []string, id int, epochId *big.Int, tree *imt.IncrementalMerkleTree, pids, cids []string) (*ipfs.BatchSubmission, error) {
+func BuildBatch(dataIds, data []string, epochId *big.Int, tree *imt.IncrementalMerkleTree, pids, cids []string) (*ipfs.BatchSubmission, error) {
 	log.Debugln("Building batch for epoch: ", epochId.String())
 	var err error
 	_, err = UpdateMerkleTree(dataIds, tree)
@@ -260,32 +251,31 @@ func BuildBatch(dataIds, data []string, id int, epochId *big.Int, tree *imt.Incr
 		return nil, err
 	}
 	roothash := GetRootHash(tree)
-	log.Debugln("RootHash for batch ", id, roothash)
-	batch := &ipfs.Batch{ID: big.NewInt(int64(id)), SubmissionIds: dataIds, Submissions: data, RootHash: roothash, Pids: pids, Cids: cids}
+	log.Debugln("RootHash for batch in epoch", epochId.String(), roothash)
+	batch := &ipfs.Batch{SubmissionIds: dataIds, Submissions: data, RootHash: roothash, Pids: pids, Cids: cids}
 	if cid, err := ipfs.StoreOnIPFS(ipfs.IPFSCon, batch); err != nil {
-		clients.SendFailureNotification("Build Batch", fmt.Sprintf("Error storing batch %d on IPFS: %s", id, err.Error()), time.Now().String(), "High")
-		log.Errorf("Error storing batch on IPFS: %d", id)
+		clients.SendFailureNotification("Build Batch", fmt.Sprintf("Error storing batch on IPFS: %s", err.Error()), time.Now().String(), "High")
+		log.Errorf("Error storing batch on IPFS: %s", err.Error())
 		return nil, err
 	} else {
-		log.Debugln("Stored cid for batch ", id, cid)
+		log.Debugln("Stored cid for batch ", cid)
 		// Set batch building success for epochId
 		logEntry := map[string]interface{}{
 			"epoch_id":          epochId.String(),
-			"batch_id":          id,
 			"batch_cid":         cid,
 			"submissions_count": len(data),
 			"submissions":       data,
 			"timestamp":         time.Now().Unix(),
 		}
 
-		if err = redis.SetProcessLog(context.Background(), redis.TriggeredProcessLog(pkgs.BuildBatch, strconv.Itoa(id)), logEntry, 4*time.Hour); err != nil {
+		if err = redis.SetProcessLog(context.Background(), redis.TriggeredProcessLog(pkgs.BuildBatch, roothash), logEntry, 4*time.Hour); err != nil {
 			clients.SendFailureNotification("BuildBatch", err.Error(), time.Now().String(), "High")
 			log.Errorln("BuildBatch process log error: ", err.Error())
 		}
 
 		cidTree, _ := imt.New()
 		if _, err := UpdateMerkleTree(batch.Cids, cidTree); err != nil {
-			clients.SendFailureNotification("Build Batch", fmt.Sprintf("Error updating merkle tree for batch %d: %s", id, err.Error()), time.Now().String(), "High")
+			clients.SendFailureNotification("Build Batch", fmt.Sprintf("Error updating merkle tree for batch with roothash %s: %s", roothash, err.Error()), time.Now().String(), "High")
 			log.Errorln("Unable to get finalized root hash: ", err.Error())
 			return nil, err
 		}

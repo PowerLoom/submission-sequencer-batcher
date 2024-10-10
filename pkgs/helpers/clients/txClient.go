@@ -25,7 +25,6 @@ type SubmissionBatchSizeRequest struct {
 type SubmitSubmissionBatchRequest struct {
 	DataMarketAddress     string   `json:"dataMarket"`
 	BatchCid              string   `json:"batchCid"`
-	BatchId               string   `json:"batchId"`
 	EpochId               *big.Int `json:"epochId"`
 	ProjectIds            []string `json:"projectIds"`
 	SnapshotCids          []string `json:"snapshotCids"`
@@ -76,11 +75,10 @@ func SendSubmissionBatchSize(epochId *big.Int, size int) error {
 	return nil
 }
 
-func SubmitSubmissionBatch(dataMarketAddress string, batchCid string, batchId string, epochId *big.Int, projectIds []string, snapshotCids []string, finalizedCidsRootHash string) error {
+func SubmitSubmissionBatch(dataMarketAddress string, batchCid string, epochId *big.Int, projectIds []string, snapshotCids []string, finalizedCidsRootHash string) error {
 	request := SubmitSubmissionBatchRequest{
 		DataMarketAddress:     dataMarketAddress,
 		BatchCid:              batchCid,
-		BatchId:               batchId,
 		EpochId:               epochId,
 		ProjectIds:            projectIds,
 		SnapshotCids:          snapshotCids,

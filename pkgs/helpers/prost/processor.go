@@ -215,11 +215,10 @@ func triggerCollectionFlow(epochID *big.Int, headers []string, day *big.Int) {
 		}
 		// now send the actual batches by looping through them
 		for _, batch := range batchSubmissions {
-			log.Debugln("Submitting batch with CID against batch ID and epoch ID", batch.Cid, batch.Batch.ID.String(), epochID.String())
+			log.Debugln("Submitting batch with CID against epoch ID", batch.Cid, epochID.String())
 			clients.SubmitSubmissionBatch(
 				config.SettingsObj.DataMarketAddress,
 				batch.Cid,
-				batch.Batch.ID.String(),
 				epochID,
 				batch.Batch.Pids,
 				batch.Batch.Cids,
@@ -229,20 +228,7 @@ func triggerCollectionFlow(epochID *big.Int, headers []string, day *big.Int) {
 			time.Sleep(time.Duration(config.SettingsObj.BlockTime*500) * time.Millisecond)
 		}
 		redis.ResetCollectorDBSubmissions(context.Background(), epochID, headers)
-		// ensure all transactions were included after waiting for new block
-		// log.Debugln("Verifying all batch submissions")
-		// txManager.EnsureBatchSubmissionSuccess(epochID)
-		// if count, err := redis.Get(context.Background(), redis.TransactionReceiptCountByEvent(epochID.String())); count != "" {
-		// 	log.Debugf("Transaction receipt fetches for epoch %s: %s", epochID.String(), count)
-		// 	n, _ := strconv.Atoi(count)
-		// 	if n > len(batchSubmissions)*3 { // giving upto 3 retries per txn
-		// 		clients.SendFailureNotification("EnsureBatchSubmissionSuccess", fmt.Sprintf("Too many transaction receipts fetched for epoch %s: %s", epochID.String(), count), time.Now().String(), "Medium")
-		// 		log.Errorf("Too many transaction receipts fetched for epoch %s: %s", epochID.String(), count)
-		// 	}
-		// } else if err != nil {
-		// 	clients.SendFailureNotification("Redis error", err.Error(), time.Now().String(), "High")
-		// 	log.Errorln("Redis error: ", err.Error())
-		// }
+
 		redis.Delete(context.Background(), redis.TransactionReceiptCountByEvent(epochID.String()))
 
 		// txManager.EndBatchSubmissionsForEpoch(epochID)

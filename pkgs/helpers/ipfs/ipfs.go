@@ -17,7 +17,6 @@ var IPFSCon *shell.Shell
 
 // Batch represents your data structure
 type Batch struct {
-	ID            *big.Int `json:"id"`
 	SubmissionIds []string `json:"submissionIds"`
 	Submissions   []string `json:"submissions"`
 	RootHash      string   `json:"roothash"`

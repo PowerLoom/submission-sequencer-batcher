@@ -5,7 +5,6 @@ import (
 	"collector/pkgs"
 	"collector/pkgs/contract"
 	"collector/pkgs/helpers/clients"
-	"collector/pkgs/helpers/merkle"
 	"collector/pkgs/helpers/redis"
 	"context"
 	"fmt"
@@ -71,12 +70,6 @@ func PopulateStateVars() {
 		redis.Set(context.Background(), pkgs.CurrentEpoch, CurrentEpochID.String(), 0)
 	} else {
 		CurrentEpochID.Set(big.NewInt(0))
-	}
-
-	if output, err := MustQuery[*big.Int](context.Background(), func() (*big.Int, error) {
-		return Instance.CurrentBatchId(&bind.CallOpts{}, config.SettingsObj.DataMarketContractAddress)
-	}); err == nil {
-		merkle.BatchId = int(output.Int64())
 	}
 
 	if output, err := MustQuery[*big.Int](context.Background(), func() (*big.Int, error) {
