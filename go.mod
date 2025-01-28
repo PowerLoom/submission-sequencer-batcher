@@ -14,7 +14,7 @@ require (
 	github.com/stretchr/testify v1.9.0
 	github.com/swaggo/http-swagger v1.3.4
 	github.com/swaggo/swag v1.16.3
-	google.golang.org/protobuf v1.32.0
+	google.golang.org/protobuf v1.33.0
 )
 
 require (
